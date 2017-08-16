@@ -124,7 +124,7 @@ spec:
           - -L=debug
           - --port=10262
       - name: kube-scheduler
-        image: quay.io/coreos/hyperkube:v1.7.2_coreos.0
+        image: mirantis/hypokube:final
         imagePullPolicy: IfNotPresent
         resources:
           limits:

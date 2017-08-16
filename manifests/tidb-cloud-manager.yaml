@@ -1,0 +1,37 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  namespace: kube-system
+  name: tidb-cloud-manager
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        name: tidb-cloud-manager
+        app: tidb-cloud-manager
+    spec:
+      containers:
+      - name: tidb-cloud-manager
+        image: uhub.service.ucloud.cn/pingcap/tidb-cloud-manager:latest
+        command: ["/usr/local/bin/tidb-cloud-manager"]
+        args:
+          - -L=debug
+          - -repo-prefix=uhub.service.ucloud.cn/pingcap
+          - -config-template-dir=/
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: kube-system
+  name: tidb-cloud-manager
+spec:
+  type: NodePort
+  ports:
+  - name: tidb-cloud-manager
+    port: 2333
+    targetPort: 2333
+    nodePort: 32333
+  selector:
+    app: tidb-cloud-manager

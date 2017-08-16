@@ -1,0 +1,194 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: kube-system
+  name: tidb-volume
+data:
+  # Important: all paths bellow must be sub directory of /tidb, because tidb-volume-manager can only manage directories under /tidb
+  volume: |-
+    {
+        "nodes": [
+           {
+               "name": "10.192.0.3",
+               "directories": [
+                   {
+                       "path": "/tidb/tikv-dir-1",
+                       "size": "100Gi"
+                   },
+                   {
+                       "path": "/tidb/tikv-dir-2",
+                       "size": "100Gi"
+                   }
+               ]
+           },
+           {
+               "name": "10.192.0.4",
+               "directories": [
+                   {
+                       "path": "/tidb/tikv-dir-1",
+                       "size": "50Gi"
+                   },
+                   {
+                       "path": "/tidb/tikv-dir-2",
+                       "size": "50Gi"
+                   }
+               ]
+           },
+           {
+               "name": "10.192.0.5",
+               "directories": [
+                   {
+                       "path": "/tidb/tikv-dir-1",
+                       "size": "50Gi"
+                   },
+                   {
+                       "path": "/tidb/tikv-dir-2",
+                       "size": "50Gi"
+                   }
+               ]
+           },
+           {
+               "name": "10.192.0.6",
+               "directories": [
+                   {
+                       "path": "/tidb/tikv-dir-1",
+                       "size": "50Gi"
+                   },
+                   {
+                       "path": "/tidb/tikv-dir-2",
+                       "size": "50Gi"
+                   }
+               ]
+           },
+           {
+               "name": "10.192.0.7",
+               "directories": [
+                   {
+                       "path": "/tidb/tikv-dir-1",
+                       "size": "50Gi"
+                   },
+                   {
+                       "path": "/tidb/tikv-dir-2",
+                       "size": "50Gi"
+                   }
+               ]
+           },
+           {
+               "name": "10.192.0.8",
+               "directories": [
+                   {
+                       "path": "/tidb/tikv-dir-1",
+                       "size": "50Gi"
+                   },
+                   {
+                       "path": "/tidb/tikv-dir-2",
+                       "size": "50Gi"
+                   }
+               ]
+           },
+           {
+               "name": "10.192.0.9",
+               "directories": [
+                   {
+                       "path": "/tidb/tikv-dir-1",
+                       "size": "50Gi"
+                   },
+                   {
+                       "path": "/tidb/tikv-dir-2",
+                       "size": "50Gi"
+                   }
+               ]
+           },
+           {
+               "name": "10.192.0.10",
+               "directories": [
+                   {
+                       "path": "/tidb/tikv-dir-1",
+                       "size": "50Gi"
+                   },
+                   {
+                       "path": "/tidb/tikv-dir-2",
+                       "size": "50Gi"
+                   }
+               ]
+           },
+           {
+               "name": "10.192.0.11",
+               "directories": [
+                   {
+                       "path": "/tidb/tikv-dir-1",
+                       "size": "50Gi"
+                   },
+                   {
+                       "path": "/tidb/tikv-dir-2",
+                       "size": "50Gi"
+                   }
+               ]
+           },
+           {
+               "name": "10.192.0.12",
+               "directories": [
+                   {
+                       "path": "/tidb/tikv-dir-1",
+                       "size": "50Gi"
+                   },
+                   {
+                       "path": "/tidb/tikv-dir-2",
+                       "size": "50Gi"
+                   }
+               ]
+           },
+           {
+               "name": "10.192.0.13",
+               "directories": [
+                   {
+                       "path": "/tidb/tikv-dir-1",
+                       "size": "50Gi"
+                   },
+                   {
+                       "path": "/tidb/tikv-dir-2",
+                       "size": "50Gi"
+                   }
+               ]
+           },
+           {
+               "name": "10.192.0.14",
+               "directories": [
+                   {
+                       "path": "/tidb/tikv-dir-1",
+                       "size": "50Gi"
+                   },
+                   {
+                       "path": "/tidb/tikv-dir-2",
+                       "size": "50Gi"
+                   }
+               ]
+           },
+           {
+               "name": "10.192.0.15",
+               "directories": [
+                   {
+                       "path": "/tidb/tikv-dir-1",
+                       "size": "50Gi"
+                   },
+                   {
+                       "path": "/tidb/tikv-dir-2",
+                       "size": "50Gi"
+                   }
+               ]
+           },
+           {
+               "name": "10.192.0.16",
+               "directories": [
+                   {
+                       "path": "/tidb/tikv-dir-1",
+                       "size": "50Gi"
+                   },
+                   {
+                       "path": "/tidb/tikv-dir-2",
+                       "size": "50Gi"
+                   }
+               ]
+           }
+        ]
+    }

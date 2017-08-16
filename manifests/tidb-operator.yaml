@@ -1,0 +1,201 @@
+kind: StorageClass
+apiVersion: storage.k8s.io/v1beta1
+metadata:
+  name: pingcap-volume-provisioner
+provisioner: pingcap.com/volume-provisioner
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  namespace: kube-system
+  name: tidb-operator
+  labels:
+    app: tidb-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tidb-operator
+      name: tidb-operator
+  template:
+    metadata:
+      labels:
+        app: tidb-operator
+        name: tidb-operator
+    spec:
+      containers:
+      - name: tidb-operator
+        image: uhub.service.ucloud.cn/pingcap/tidb-operator:latest
+        args:
+          - /usr/local/bin/tidb-operator
+          - -L=debug
+        env:
+        volumeMounts:
+          - name: timezone
+            mountPath: /etc/localtime
+      volumes:
+      - name: timezone
+        hostPath:
+          path: /etc/localtime
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: kube-system
+  name: tidb-scheduler-policy
+  labels:
+    app: tidb-operator
+data:
+  policy.cfg: |-
+    {
+            "kind" : "Policy",
+            "apiVersion" : "v1",
+            "predicates": [
+                    {"name": "MatchNodeSelector"},
+                    {"name": "PodFitsResources"},
+                    {"name": "PodFitsHostPorts"},
+                    {"name": "HostName"},
+                    {"name": "NoDiskConflict"},
+                    {"name": "PodToleratesNodeTaints"},
+                    {"name": "CheckNodeMemoryPressure"},
+                    {"name": "CheckNodeDiskPressure"},
+                    {"name": "MatchInterPodAffinity"},
+                    {"name": "GeneralPredicates"}
+            ],
+            "priorities": [
+                    {"name": "EqualPriority", "weight": 1},
+                    {"name": "ImageLocalityPriority", "weight": 1},
+                    {"name": "LeastRequestedPriority", "weight": 1},
+                    {"name": "BalancedResourceAllocation", "weight": 1},
+                    {"name": "SelectorSpreadPriority", "weight": 1},
+                    {"name": "NodePreferAvoidPodsPriority", "weight": 1},
+                    {"name": "NodeAffinityPriority", "weight": 1},
+                    {"name": "TaintTolerationPriority", "weight": 1},
+                    {"name": "InterPodAffinityPriority", "weight": 1},
+                    {"name": "MostRequestedPriority", "weight": 1}
+            ],
+            "extenders": [
+                    {
+                            "urlPrefix": "http://127.0.0.1:10262/scheduler",
+                            "filterVerb": "filter",
+                            "weight": 1,
+                            "httpTimeout": 30000000000,
+                            "enableHttps": false
+                    }
+            ]
+    }
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  namespace: kube-system
+  name: tidb-scheduler
+  labels:
+    app: tidb-operator
+spec:
+  selector:
+    matchLabels:
+      app: tidb-operator
+      name: tidb-scheduler
+  template:
+    metadata:
+      labels:
+        app: tidb-operator
+        name: tidb-scheduler
+    spec:
+      hostNetwork: true
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        operator: "Equal"
+        effect: "NoSchedule"
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+                # all master node's labels must contain this key
+              - key: node-role.kubernetes.io/master
+                operator: Exists
+      containers:
+      - name: tidb-scheduler
+        image: uhub.service.ucloud.cn/pingcap/tidb-operator:latest
+        args:
+          - /usr/local/bin/tidb-scheduler
+          - -L=debug
+          - --port=10262
+      - name: kube-scheduler
+        image: quay.io/coreos/hyperkube:v1.7.2_coreos.0
+        imagePullPolicy: IfNotPresent
+        resources:
+          limits:
+            cpu: 250m
+            memory: 512M
+          requests:
+            cpu: 80m
+            memory: 170M
+        command:
+        - /hyperkube
+        - scheduler
+        - --master=http://127.0.0.1:8080
+        - --port=10261
+        - --leader-elect=true
+        - --lock-object-name=tidb-scheduler
+        - --lock-object-namespace=kube-system
+        - --scheduler-name=tidb-scheduler
+        - --v=2
+        - --policy-configmap=tidb-scheduler-policy
+        - --policy-configmap-namespace=kube-system
+        livenessProbe:
+          httpGet:
+            host: 127.0.0.1
+            path: /healthz
+            port: 10261
+          initialDelaySeconds: 30
+          timeoutSeconds: 10
+        volumeMounts:
+        - name: k8sconfig
+          mountPath: /etc/kubernetes
+      volumes:
+      - name: k8sconfig
+        hostPath:
+          path: /etc/kubernetes
+---
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  namespace: kube-system
+  name: tidb-volume-manager
+  labels:
+    app: tidb-operator
+spec:
+  selector:
+    matchLabels:
+      app: tidb-operator
+      name: tidb-volume-manager
+  template:
+    metadata:
+      labels:
+        app: tidb-operator
+        name: tidb-volume-manager
+    spec:
+      containers:
+      - name: tidb-volume-manager
+        image: uhub.service.ucloud.cn/pingcap/tidb-operator:latest
+        command:
+          - /usr/local/bin/tidb-volume-manager
+          - --v=2
+        volumeMounts:
+          - name: tidb
+            mountPath: /tidb
+        env:
+        - name: MY_NODE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+      volumes:
+      - name: tidb
+        hostPath:
+          ##################################################################################################
+          # This path is the parent dir of all volumes, must be same as example/tidb-volume-configmap.yaml #
+          ##################################################################################################
+          path: /tidb

@@ -23,7 +23,7 @@ if [ $(uname) = Darwin ]; then
 else
   readlinkf(){ readlink -f "$1"; }
 fi
-DIND_ROOT="$(cd $(dirname "$(readlinkf "${BASH_SOURCE}")"); pwd)"
+DIND_ROOT="$(cd $(dirname "$(readlinkf "${BASH_SOURCE}")")/..; pwd)"
 
 RUN_ON_BTRFS_ANYWAY="${RUN_ON_BTRFS_ANYWAY:-}"
 if [[ ! ${RUN_ON_BTRFS_ANYWAY} ]] && docker info| grep -q '^Storage Driver: btrfs'; then
@@ -57,14 +57,15 @@ dind_ip_base="$(echo "${DIND_SUBNET}" | sed 's/\.0$//')"
 DIND_IMAGE="${DIND_IMAGE:-}"
 BUILD_KUBEADM="${BUILD_KUBEADM:-}"
 BUILD_HYPERKUBE="${BUILD_HYPERKUBE:-}"
-APISERVER_PORT=${APISERVER_PORT:-8080}
-NUM_NODES=${NUM_NODES:-2}
+APISERVER_PORT="${APISERVER_PORT:-8080}"
+NUM_NODES="${NUM_NODES:-12}"
 LOCAL_KUBECTL_VERSION=${LOCAL_KUBECTL_VERSION:-}
 KUBECTL_DIR="${KUBECTL_DIR:-${HOME}/.kubeadm-dind-cluster}"
-DASHBOARD_URL="${DASHBOARD_URL:-https://rawgit.com/kubernetes/dashboard/bfab10151f012d1acc5dfb1979f3172e2400aa3c/src/deploy/kubernetes-dashboard.yaml}"
+DASHBOARD_URL="${DASHBOARD_URL:-${DIND_ROOT}/manifests/kubernetes-dashboard.yaml}"
 SKIP_SNAPSHOT="${SKIP_SNAPSHOT:-}"
 E2E_REPORT_DIR="${E2E_REPORT_DIR:-}"
 DIND_NO_PARALLEL_E2E="${DIND_NO_PARALLEL_E2E:-}"
+KUBE_REPO_PREFIX="${KUBE_REPO_PREFIX:-uhub.service.ucloud.cn/pingcap}"
 
 if [[ ! ${LOCAL_KUBECTL_VERSION:-} && ${DIND_IMAGE:-} =~ :(v[0-9]+\.[0-9]+)$ ]]; then
   LOCAL_KUBECTL_VERSION="${BASH_REMATCH[1]}"
@@ -424,6 +425,11 @@ function dind::run {
     opts+=(-p "$portforward")
   fi
 
+  ####### expose registry port ########
+  if [[ "${container_name}" = "kube-master" ]]; then
+    opts+=(-p 127.0.0.1:5000:5001)
+  fi
+
   if [[ ${CNI_PLUGIN} = bridge && ${netshift} ]]; then
     args+=("systemd.setenv=CNI_BRIDGE_NETWORK_OFFSET=0.0.${netshift}.0")
   fi
@@ -444,8 +450,11 @@ function dind::run {
   # in case of the source build
 
   # Start the new container.
+  #-e HTTP_PROXY="${HTTP_PROXY:-}" -e HTTPS_PROXY="${HTTPS_PROXY:-}" \
+  #-e NO_PROXY="${NO_PROXY:-}" \
   docker run \
          -d --privileged \
+         -e KUBE_REPO_PREFIX="${KUBE_REPO_PREFIX}" \
          --net kubeadm-dind-net \
          --name "${container_name}" \
          --hostname "${container_name}" \
@@ -461,6 +470,9 @@ function dind::kubeadm {
   shift
   dind::step "Running kubeadm:" "$*"
   status=0
+  # add other user's write permission
+  pts=`readlink /dev/fd/2`
+  sudo chmod o+w $pts
   # See image/bare/wrapkubeadm.
   # Capturing output is necessary to grab flags for 'kubeadm join'
   if ! docker exec "${container_id}" wrapkubeadm "$@" 2>&1 | tee /dev/fd/2; then
@@ -681,6 +693,7 @@ function dind::wait-for-ready {
 
   "${kubectl}" get nodes >&2
   dind::step "Access dashboard at:" "http://localhost:${APISERVER_PORT}/ui"
+  dind::step "Deployment success"
 }
 
 function dind::up {
@@ -941,7 +954,7 @@ case "${1:-}" in
   up)
     if [[ ! ( ${DIND_IMAGE} =~ local ) ]]; then
       dind::step "Making sure DIND image is up to date"
-      docker pull "${DIND_IMAGE}" >&2
+      #docker pull "${DIND_IMAGE}" >&2
     fi
 
     dind::prepare-sys-mounts

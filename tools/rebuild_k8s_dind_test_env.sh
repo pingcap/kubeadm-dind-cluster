@@ -4,7 +4,7 @@
 REGISTRY=localhost:5000/pingcap
 SOURCE_REGISTRY=uhub.service.ucloud.cn/pingcap
 INIT_DEPLOYS="registry-proxy.yaml tidb-operator.yaml tidb-cloud-manager.yaml tidb-volume.yaml"
-IMAGES="tidb-operator:latest tidb-tools:latest tidb:latest tikv:latest pd:latest tidb-dashboard-installer:v0.1.0 grafana:4.2.0 prometheus:v1.5.2 pushgateway:v0.3.1"
+IMAGES="tidb-tools:latest tidb:latest tikv:latest pd:latest tidb-dashboard-installer:v0.1.0 grafana:4.2.0 prometheus:v1.5.2 pushgateway:v0.3.1"
 
 ### change workspace
 WORKSPACE=$(cd $(dirname $0)/..; pwd)

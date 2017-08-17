@@ -24,11 +24,11 @@ rebuild::step "start to clean useless images"
 docker images|docker images|grep -v kubeadm-dind-cluster|grep -P "tidb-operator|<none>|tidb-cloud-manager"|awk '{print $3}'|xargs -I{} -n1 docker rmi -f {} || true
 
 
-rebuild::step "start to bringing k8s dind cluster"
+rebuild::step "start to bringing up k8s dind cluster"
 
 ./fixed/dind-cluster-v1.7.sh up
 
-rebuild::step "start to bringing local registry in k8s cluster"
+rebuild::step "start to bringing up local registry in k8s cluster"
 docker exec kube-master docker run -d --restart=always -v /registry:/var/lib/registry -p5001:5000 --name=registry uhub.service.ucloud.cn/pingcap/registry:2
 
 rebuild::step "start to deploy [${INIT_DEPLOYS}] to k8s cluster"

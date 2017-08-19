@@ -684,7 +684,7 @@ function dind::wait-for-ready {
   dind::retry "${kubectl}" scale deployment --replicas=1 -n kube-system kube-dns
   dind::retry "${kubectl}" scale deployment --replicas=1 -n kube-system kubernetes-dashboard
 
-  while ! dind::component-ready k8s-app=kube-dns || ! dind::component-ready app=kubernetes-dashboard; do
+  while ! dind::component-ready k8s-app=kube-dns || ! dind::component-ready k8s-app=kubernetes-dashboard; do
     echo -n "." >&2
     dind::kill-failed-pods
     sleep 1

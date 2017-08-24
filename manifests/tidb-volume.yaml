@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  namespace: kube-system
+  namespace: pingcap
   name: tidb-volume
 data:
   # Important: all paths bellow must be sub directory of /tidb, because tidb-volume-manager can only manage directories under /tidb

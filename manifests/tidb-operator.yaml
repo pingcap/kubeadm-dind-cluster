@@ -1,3 +1,133 @@
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: pingcap
+---
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  namespace: pingcap
+  name: tidb-controller-manager
+---
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  namespace: pingcap
+  name: tidb-scheduler
+---
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  namespace: pingcap
+  name: tidb-volume-manager
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: pingcap:tidb-controller-manager
+rules:
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get"]
+- apiGroups: [""]
+  resources:
+    - pods
+    - services
+    - configmaps
+    - persistentvolumeclaims
+  verbs: ["*"]
+- apiGroups: ["apiextensions.k8s.io"]
+  resources: ["customresourcedefinitions"]
+  verbs: ["create", "get", "delete"]
+- apiGroups: [""]
+  resources: ["endpoints"]
+  verbs: ["create", "get", "update"]
+- apiGroups: ["pingcap.com"]
+  resources: ["tidbclusters", "tidbsets"]
+  verbs: ["*"]
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: pingcap:tidb-scheduler
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get"]
+- apiGroups: [""]
+  resources: ["persistentvolumeclaims"]
+  verbs: ["get", "list", "update"]
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: pingcap:tidb-volume-manager
+rules:
+- apiGroups: [""]
+  resources:
+    - events
+    - persistentvolumes
+    - persistentvolumeclaims
+  verbs: ["*"]
+- apiGroups: ["storage.k8s.io"]
+  resources: ["storageclasses"]
+  verbs: ["get", "list", "watch"]
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: pingcap:tidb-controller-manager
+subjects:
+- kind: ServiceAccount
+  name: tidb-controller-manager
+  namespace: pingcap
+- kind: ServiceAccount
+  name: tidb-scheduler
+  namespace: pingcap
+roleRef:
+  kind: ClusterRole
+  name: pingcap:tidb-controller-manager
+  apiGroup: rbac.authorization.k8s.io
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: pingcap:tidb-scheduler
+subjects:
+- kind: ServiceAccount
+  name: tidb-scheduler
+  namespace: pingcap
+roleRef:
+  kind: ClusterRole
+  name: pingcap:tidb-scheduler
+  apiGroup: rbac.authorization.k8s.io
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: pingcap:kube-scheduler
+subjects:
+- kind: ServiceAccount
+  name: tidb-scheduler
+  namespace: pingcap
+roleRef:
+  kind: ClusterRole
+  name: system:kube-scheduler
+  apiGroup: rbac.authorization.k8s.io
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: pingcap:tidb-volume-manager
+subjects:
+- kind: ServiceAccount
+  name: tidb-volume-manager
+  namespace: pingcap
+roleRef:
+  kind: ClusterRole
+  name: pingcap:tidb-volume-manager
+  apiGroup: rbac.authorization.k8s.io
+---
 kind: StorageClass
 apiVersion: storage.k8s.io/v1beta1
 metadata:
@@ -7,8 +137,8 @@ provisioner: pingcap.com/volume-provisioner
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  namespace: kube-system
-  name: tidb-operator
+  namespace: pingcap
+  name: tidb-controller-manager
   labels:
     app: tidb-operator
 spec:
@@ -16,20 +146,25 @@ spec:
   selector:
     matchLabels:
       app: tidb-operator
-      name: tidb-operator
+      name: tidb-controller-manager
   template:
     metadata:
       labels:
         app: tidb-operator
-        name: tidb-operator
+        name: tidb-controller-manager
     spec:
+      serviceAccount: tidb-controller-manager
       containers:
       - name: tidb-operator
         image: uhub.service.ucloud.cn/pingcap/tidb-operator:latest
         args:
-          - /usr/local/bin/tidb-operator
+          - /usr/local/bin/tidb-controller-manager
           - -L=debug
         env:
+          - name: MY_POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
         volumeMounts:
           - name: timezone
             mountPath: /etc/localtime
@@ -41,7 +176,7 @@ spec:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  namespace: kube-system
+  namespace: pingcap
   name: tidb-scheduler-policy
   labels:
     app: tidb-operator
@@ -86,13 +221,14 @@ data:
     }
 ---
 apiVersion: extensions/v1beta1
-kind: DaemonSet
+kind: Deployment
 metadata:
-  namespace: kube-system
+  namespace: pingcap
   name: tidb-scheduler
   labels:
     app: tidb-operator
 spec:
+  replicas: 1
   selector:
     matchLabels:
       app: tidb-operator
@@ -103,19 +239,7 @@ spec:
         app: tidb-operator
         name: tidb-scheduler
     spec:
-      hostNetwork: true
-      tolerations:
-      - key: node-role.kubernetes.io/master
-        operator: "Equal"
-        effect: "NoSchedule"
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-            - matchExpressions:
-                # all master node's labels must contain this key
-              - key: node-role.kubernetes.io/master
-                operator: Exists
+      serviceAccount: tidb-scheduler
       containers:
       - name: tidb-scheduler
         image: uhub.service.ucloud.cn/pingcap/tidb-operator:latest
@@ -123,6 +247,11 @@ spec:
           - /usr/local/bin/tidb-scheduler
           - -L=debug
           - --port=10262
+        env:
+          - name: MY_POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
       - name: kube-scheduler
         image: mirantis/hypokube:final
         imagePullPolicy: IfNotPresent
@@ -136,34 +265,27 @@ spec:
         command:
         - /hyperkube
         - scheduler
-        - --master=http://127.0.0.1:8080
         - --port=10261
         - --leader-elect=true
         - --lock-object-name=tidb-scheduler
-        - --lock-object-namespace=kube-system
+        - --lock-object-namespace=pingcap
         - --scheduler-name=tidb-scheduler
         - --v=2
         - --policy-configmap=tidb-scheduler-policy
-        - --policy-configmap-namespace=kube-system
-        livenessProbe:
-          httpGet:
-            host: 127.0.0.1
-            path: /healthz
-            port: 10261
-          initialDelaySeconds: 30
-          timeoutSeconds: 10
-        volumeMounts:
-        - name: k8sconfig
-          mountPath: /etc/kubernetes
-      volumes:
-      - name: k8sconfig
-        hostPath:
-          path: /etc/kubernetes
+        - --policy-configmap-namespace=pingcap
+        # TODO: find the reason why health-check failed and uncomment following lines
+        # livenessProbe:
+        #   httpGet:
+        #     host: 127.0.0.1
+        #     path: /healthz
+        #     port: 10261
+        #   initialDelaySeconds: 30
+        #   timeoutSeconds: 10
 ---
 apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
-  namespace: kube-system
+  namespace: pingcap
   name: tidb-volume-manager
   labels:
     app: tidb-operator
@@ -178,6 +300,7 @@ spec:
         app: tidb-operator
         name: tidb-volume-manager
     spec:
+      serviceAccount: tidb-volume-manager
       containers:
       - name: tidb-volume-manager
         image: uhub.service.ucloud.cn/pingcap/tidb-operator:latest
@@ -196,6 +319,6 @@ spec:
       - name: tidb
         hostPath:
           ##################################################################################################
-          # This path is the parent dir of all volumes, must be same as example/tidb-volume-configmap.yaml #
+          # This path is the parent dir of all volumes, must be same as manifests/tidb-volume-configmap.yaml #
           ##################################################################################################
           path: /tidb

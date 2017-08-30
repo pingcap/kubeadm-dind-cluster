@@ -311,10 +311,10 @@ spec:
           - name: tidb
             mountPath: /tidb
         env:
-        - name: MY_NODE_IP
+        - name: MY_NODE_NAME
           valueFrom:
             fieldRef:
-              fieldPath: status.hostIP
+              fieldPath: spec.nodeName
       volumes:
       - name: tidb
         hostPath:

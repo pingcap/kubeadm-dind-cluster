@@ -9,7 +9,7 @@ data:
     {
         "nodes": [
            {
-               "name": "10.192.0.3",
+               "name": "kube-node-1",
                "directories": [
                    {
                        "path": "/tidb/tikv-dir-1",
@@ -22,7 +22,7 @@ data:
                ]
            },
            {
-               "name": "10.192.0.4",
+               "name": "kube-node-2",
                "directories": [
                    {
                        "path": "/tidb/tikv-dir-1",
@@ -35,7 +35,7 @@ data:
                ]
            },
            {
-               "name": "10.192.0.5",
+               "name": "kube-node-3",
                "directories": [
                    {
                        "path": "/tidb/tikv-dir-1",
@@ -48,7 +48,7 @@ data:
                ]
            },
            {
-               "name": "10.192.0.6",
+               "name": "kube-node-4",
                "directories": [
                    {
                        "path": "/tidb/tikv-dir-1",
@@ -61,7 +61,7 @@ data:
                ]
            },
            {
-               "name": "10.192.0.7",
+               "name": "kube-node-5",
                "directories": [
                    {
                        "path": "/tidb/tikv-dir-1",
@@ -74,7 +74,7 @@ data:
                ]
            },
            {
-               "name": "10.192.0.8",
+               "name": "kube-node-6",
                "directories": [
                    {
                        "path": "/tidb/tikv-dir-1",
@@ -87,7 +87,7 @@ data:
                ]
            },
            {
-               "name": "10.192.0.9",
+               "name": "kube-node-7",
                "directories": [
                    {
                        "path": "/tidb/tikv-dir-1",
@@ -100,7 +100,7 @@ data:
                ]
            },
            {
-               "name": "10.192.0.10",
+               "name": "kube-node-8",
                "directories": [
                    {
                        "path": "/tidb/tikv-dir-1",
@@ -113,7 +113,7 @@ data:
                ]
            },
            {
-               "name": "10.192.0.11",
+               "name": "kube-node-9",
                "directories": [
                    {
                        "path": "/tidb/tikv-dir-1",
@@ -126,7 +126,7 @@ data:
                ]
            },
            {
-               "name": "10.192.0.12",
+               "name": "kube-node-10",
                "directories": [
                    {
                        "path": "/tidb/tikv-dir-1",
@@ -139,7 +139,7 @@ data:
                ]
            },
            {
-               "name": "10.192.0.13",
+               "name": "kube-node-11",
                "directories": [
                    {
                        "path": "/tidb/tikv-dir-1",
@@ -152,7 +152,7 @@ data:
                ]
            },
            {
-               "name": "10.192.0.14",
+               "name": "kube-node-12",
                "directories": [
                    {
                        "path": "/tidb/tikv-dir-1",
@@ -165,7 +165,7 @@ data:
                ]
            },
            {
-               "name": "10.192.0.15",
+               "name": "kube-node-13",
                "directories": [
                    {
                        "path": "/tidb/tikv-dir-1",
@@ -178,7 +178,7 @@ data:
                ]
            },
            {
-               "name": "10.192.0.16",
+               "name": "kube-node-14",
                "directories": [
                    {
                        "path": "/tidb/tikv-dir-1",

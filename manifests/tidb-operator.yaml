@@ -157,6 +157,13 @@ spec:
       containers:
       - name: tidb-operator
         image: uhub.service.ucloud.cn/pingcap/tidb-operator:latest
+        resources:
+          limits:
+            cpu: 250m
+            memory: 150M
+          requests:
+            cpu: 80m
+            memory: 50M
         args:
           - /usr/local/bin/tidb-controller-manager
           - -L=debug
@@ -243,6 +250,13 @@ spec:
       containers:
       - name: tidb-scheduler
         image: uhub.service.ucloud.cn/pingcap/tidb-operator:latest
+        resources:
+          limits:
+            cpu: 250m
+            memory: 150M
+          requests:
+            cpu: 80m
+            memory: 50M
         args:
           - /usr/local/bin/tidb-scheduler
           - -L=debug
@@ -304,8 +318,16 @@ spec:
       containers:
       - name: tidb-volume-manager
         image: uhub.service.ucloud.cn/pingcap/tidb-operator:latest
+        resources:
+          limits:
+            cpu: 250m
+            memory: 150M
+          requests:
+            cpu: 80m
+            memory: 50M
         command:
           - /usr/local/bin/tidb-volume-manager
+          - --pvdir=/tidb
           - --v=2
         volumeMounts:
           - name: tidb
@@ -318,7 +340,4 @@ spec:
       volumes:
       - name: tidb
         hostPath:
-          ##################################################################################################
-          # This path is the parent dir of all volumes, must be same as manifests/tidb-volume-configmap.yaml #
-          ##################################################################################################
           path: /tidb

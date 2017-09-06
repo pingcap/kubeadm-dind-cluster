@@ -1,30 +1,64 @@
-apiVersion: extensions/v1beta1
-kind: Deployment
+apiVersion: v1
+kind: Namespace
 metadata:
-  namespace: kube-system
+  name: pingcap
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  namespace: pingcap
   name: tidb-cloud-manager
-spec:
-  replicas: 1
-  template:
-    metadata:
-      labels:
-        name: tidb-cloud-manager
-        app: tidb-cloud-manager
-    spec:
-      containers:
-      - name: tidb-cloud-manager
-        image: uhub.service.ucloud.cn/pingcap/tidb-cloud-manager:latest
-        command: ["/usr/local/bin/tidb-cloud-manager"]
-        args:
-          - -L=debug
-          - -repo-prefix=uhub.service.ucloud.cn/pingcap
-          - -config-template-dir=/
-
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  name: pingcap:tidb-cloud-manager
+rules:
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["configmaps", "services", "pods"]
+  verbs: ["*"]
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["create", "delete"]
+- apiGroups: ["apps", "extensions"]
+  resources: ["deployments"]
+  verbs: ["*"]
+- apiGroups: [""]
+  resources: ["persistentvolumeclaims"]
+  verbs: ["get", "create", "update"]
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["get", "list", "create", "delete"]
+- apiGroups: ["pingcap.com"]
+  resources: ["tidbclusters", "tidbsets", "tidbinstances"]
+  verbs: ["*"]
+- apiGroups: ["apiextensions.k8s.io"]
+  resources: ["customresourcedefinitions"]
+  verbs: ["create", "get", "delete"]
+- apiGroups: [""]
+  resources: ["endpoints"]
+  verbs: ["create", "get", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: pingcap:tidb-cloud-manager
+subjects:
+- kind: ServiceAccount
+  name: tidb-cloud-manager
+  namespace: pingcap
+roleRef:
+  kind: ClusterRole
+  name: pingcap:tidb-cloud-manager
+  apiGroup: rbac.authorization.k8s.io
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  namespace: kube-system
+  namespace: pingcap
   name: tidb-cloud-manager
 spec:
   type: NodePort
@@ -35,3 +69,31 @@ spec:
     nodePort: 32333
   selector:
     app: tidb-cloud-manager
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  namespace: pingcap
+  name: tidb-cloud-manager
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        name: tidb-cloud-manager
+        app: tidb-cloud-manager
+    spec:
+      serviceAccount: tidb-cloud-manager
+      containers:
+      - name: tidb-cloud-manager
+        image: pingcap/tidb-cloud-manager:latest
+        command: ["/usr/local/bin/tidb-cloud-manager"]
+        args:
+          - -L=debug
+          - -repo-prefix=uhub.ucloud.cn/pingcap
+          # - -alertmanagerURL=http://alertmanager.kube-system:9093
+        env:
+          - name: MY_POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace

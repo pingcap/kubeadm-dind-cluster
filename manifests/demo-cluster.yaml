@@ -1,24 +1,61 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: demo-ns
+  name: "tidb-demo"
 ---
 apiVersion: pingcap.com/v1
 kind: TidbCluster
 metadata:
+  namespace: tidb-demo
   name: demo-cluster
-  namespace: demo-ns
 spec:
   pd:
-    size: 1
+    size: 3
     image: uhub.service.ucloud.cn/pingcap/pd:latest
+    # # If resource constraints or custom schedules are required, please uncomment the following lines of code
+    # limits:
+    #   cpu: "1.5"   # quantity and unit format follows kubernetes convention
+    #   memory: 2Gi
+    #   storage: "0" # 0 means unlimited
+    # requests:
+    #   cpu: "1"
+    #   memory: 2Gi
+    #   storage: 1Gi
+    # nodeSelector:
+    #   kind: pd
+    #   zone: "cn-bj1-01,cn-bj2-02"
+    #   region: "cn-bj1,cn-bj2"
   tidb:
     size: 2
     image: uhub.service.ucloud.cn/pingcap/tidb:latest
+    # limits:
+    #   cpu: "12"
+    #   memory: 25Gi
+    #   storage: "0"
+    # requests:
+    #   cpu: "10"
+    #   memory: 25Gi
+    #   storage: "0"
   tikv:
     size: 3
     image: uhub.service.ucloud.cn/pingcap/tikv:latest
-  service: ClusterIP
+    # limits:
+    #   cpu: "10"
+    #   memory: 20Gi
+    #   storage: 500Gi
+    # requests:
+    #   cpu: "8"
+    #   memory: 20Gi
+    #   storage: 300Gi
+    # nodeSelector:
+    #   kind: pd
+    #   zone: "cn-bj1-01,cn-bj2-02"
+    #   region: "cn-bj1,cn-bj2"
+    #   rack: "rack1,rack2,rack3,rack4"
+    # # indicating whether pod must be deployed on the regions/zones/racks above
+    # # has no effect if nodeSelector is empty
+    # nodeSelectorRequired: false # default is false
+  service: NodePort # ClusterIP | NodePort | LoadBalancer for tidb service
   config:
     tidb.lease: "1"
     tidb.metrics-addr: ""
@@ -41,8 +78,28 @@ spec:
       initial-cluster-state = ""
 
       lease = 3
-      log-level = "info"
       tso-save-interval = "3s"
+
+      [log]
+      level = "info"
+
+      # log format, one of json, text, console
+      #format = "text"
+
+      # disable automatic timestamps in output
+      #disable-timestamp = false
+
+      # file logging
+      [log.file]
+      #filename = ""
+      # max log file size in MB
+      #max-size = 300
+      # max log file keep days
+      #max-days = 28
+      # maximum number of old log files to retain
+      #max-backups = 7
+      # rotate log by day
+      #log-rotate = true
 
       [metric]
       # prometheus client push interval, set "0s" to disable prometheus.
@@ -51,15 +108,11 @@ spec:
       address = ""
 
       [schedule]
-      min-region-count = 10
-      min-leader-count = 10
       max-snapshot-count = 3
-      min-balance-diff-ratio = 0.01
-      max-store-down-duration = "1h"
-      schedule-interval = "5s"
-      leader-schedule-limit = 16
-      region-schedule-limit = 12
-      replica-schedule-limit = 16
+      max-store-down-time = "1h"
+      leader-schedule-limit = 64
+      region-schedule-limit = 16
+      replica-schedule-limit = 24
 
       [replication]
       # The number of replicas for each region.
@@ -68,8 +121,7 @@ spec:
       # The placement priorities is implied by the order of label keys.
       # For example, ["zone", "rack"] means that we should place replicas to
       # different zones first, then to different racks if we don't have enough zones.
-      location-labels = []
-
+      location-labels = ["zone", "rack", "host"]
 
     tikv-config: |
       # TiKV config template
@@ -112,6 +164,7 @@ spec:
       [storage]
       # set the path to rocksdb directory.
       data-dir = "/tmp/tikv/store"
+
       # notify capacity of scheduler's channel
       # scheduler-notify-capacity = 10240
 
@@ -140,6 +193,9 @@ spec:
       [raftstore]
       # true (default value) for high reliability, this can prevent data loss when power failure.
       sync-log = true
+
+      # set the path to raftdb directory, default value is data-dir/raft
+      # raftdb-path = ""
 
       # set store capacity, if no set, use disk capacity.
       # capacity = 0
@@ -199,13 +255,6 @@ spec:
       # consistency-check-interval = 0
 
       [rocksdb]
-      # RocksDB info log directory, if set, RocksDB will save the log in `info-log-dir/LOG`.
-      # info-log-dir = ""
-      # Maximal size of the info log, if new info log will be created if size is large than it.
-      # info-log-max-size = 0
-      # Time for the info log file to roll (in seconds).
-      # info-log-roll-time = "0s"
-
       # Maximum number of concurrent background jobs (compactions and flushes)
       # max-background-jobs = 8
 
@@ -392,9 +441,38 @@ spec:
       # cache-index-and-filter-blocks = true
       # compaction-pri = 3
 
-      # options for Column Family raft.
-      # Column Family raft is used to store raft log and raft states.
-      [rocksdb.raftcf]
+      [rocksdb.lockcf]
+      # compression-per-level = ["no", "no", "no", "no", "no", "no", "no"]
+      # block-size = "16KB"
+      # write-buffer-size = "128MB"
+      # max-write-buffer-number = 5
+      # min-write-buffer-number-to-merge = 1
+      # max-bytes-for-level-base = "128MB"
+      # target-file-size-base = "32MB"
+      # block-cache-size = "256MB"
+      # level0-file-num-compaction-trigger = 1
+      # level0-slowdown-writes-trigger = 20
+      # level0-stop-writes-trigger = 36
+      # cache-index-and-filter-blocks = true
+      # compaction-pri = 0
+
+      [raftdb]
+      # max-sub-compactions = 1
+      # max-open-files = 40960
+      max-manifest-file-size = "20MB"
+      create-if-missing = true
+      # writable-file-max-buffer-size = "1MB"
+
+      # enable-statistics = true
+      stats-dump-period = "10m"
+
+      # compaction-readahead-size = 0
+      # writable-file-max-buffer-size = "1MB"
+      # use-direct-io-for-flush-and-compaction = false
+      # enable-pipelined-write = true
+      # allow-concurrent-memtable-write = false
+
+      [raftdb.defaultcf]
       # compression-per-level = ["no", "no", "lz4", "lz4", "lz4", "zstd", "zstd"]
       # block-size = "64KB"
       # write-buffer-size = "128MB"
@@ -406,21 +484,6 @@ spec:
       # should tune to 256MB~2GB.
       # block-cache-size = "256MB"
       # level0-file-num-compaction-trigger = 4
-      # level0-slowdown-writes-trigger = 20
-      # level0-stop-writes-trigger = 36
-      # cache-index-and-filter-blocks = true
-      # compaction-pri = 0
-
-      [rocksdb.lockcf]
-      # compression-per-level = ["no", "no", "no", "no", "no", "no", "no"]
-      # block-size = "16KB"
-      # write-buffer-size = "128MB"
-      # max-write-buffer-number = 5
-      # min-write-buffer-number-to-merge = 1
-      # max-bytes-for-level-base = "128MB"
-      # target-file-size-base = "32MB"
-      # block-cache-size = "256MB"
-      # level0-file-num-compaction-trigger = 1
       # level0-slowdown-writes-trigger = 20
       # level0-stop-writes-trigger = 36
       # cache-index-and-filter-blocks = true

@@ -1,0 +1,23 @@
+{
+    "name": "demo",
+    "service_type": "NodePort",
+    "tidb_lease": 1,
+    "pd": {
+        "size": 1,
+        "version": "latest"
+    },
+    "tidb": {
+        "size": 1,
+        "version": "latest"
+    },
+    "tikv": {
+        "size": 3,
+        "version": "latest"
+    },
+    "monitor": {
+        "size": 1,
+        "version": "4.2.0,v1.5.2,v0.3.1,v0.1.0"
+    },
+    "monitor_reserve_days": 35,
+    "root_password": "pingcap123456"
+}

@@ -40,7 +40,7 @@ if docker info|grep -s '^Kernel Version: .*-moby$' > /dev/null 2>&1; then
     is_moby_linux=1
 fi
 
-EMBEDDED_CONFIG=y;DIND_IMAGE=mirantis/kubeadm-dind-cluster:v1.7
+EMBEDDED_CONFIG=y;DIND_IMAGE=uhub.service.ucloud.cn/pingcap/kubeadm-dind-cluster/kubeadm-dind-cluster:v1.7
 
 if [[ ! ${EMBEDDED_CONFIG:-} ]]; then
   source "${DIND_ROOT}/config.sh"
@@ -954,7 +954,7 @@ case "${1:-}" in
   up)
     if [[ ! ( ${DIND_IMAGE} =~ local ) ]]; then
       dind::step "Making sure DIND image is up to date"
-      #docker pull "${DIND_IMAGE}" >&2
+      docker pull "${DIND_IMAGE}" >&2
     fi
 
     dind::prepare-sys-mounts

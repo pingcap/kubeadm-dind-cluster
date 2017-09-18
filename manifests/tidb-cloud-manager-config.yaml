@@ -1,0 +1,706 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: pingcap
+  name: tidb-instance-config-template
+data:
+  pd-config: |-
+    # PD Configuration.
+    name = "pd"
+    data-dir = "default.pd"
+
+    client-urls = ""
+    # if not set, use ${client-urls}
+    advertise-client-urls = ""
+
+    peer-urls = ""
+    # if not set, use ${peer-urls}
+    advertise-peer-urls = ""
+
+    initial-cluster = ""
+    initial-cluster-state = ""
+
+    lease = 3
+    tso-save-interval = "3s"
+
+    [log]
+    level = "info"
+
+    # log format, one of json, text, console
+    #format = "text"
+
+    # disable automatic timestamps in output
+    #disable-timestamp = false
+
+    # file logging
+    [log.file]
+    #filename = ""
+    # max log file size in MB
+    #max-size = 300
+    # max log file keep days
+    #max-days = 28
+    # maximum number of old log files to retain
+    #max-backups = 7
+    # rotate log by day
+    #log-rotate = true
+
+    [metric]
+    # prometheus client push interval, set "0s" to disable prometheus.
+    interval = "15s"
+    # prometheus pushgateway address, leaves it empty will disable prometheus.
+    address = "{{.MetricsAddr}}"
+
+    [schedule]
+    max-snapshot-count = 3
+    max-store-down-time = "1h"
+    leader-schedule-limit = 64
+    region-schedule-limit = 16
+    replica-schedule-limit = 24
+
+    [replication]
+    # The number of replicas for each region.
+    max-replicas = 3
+    # The label keys specified the location of a store.
+    # The placement priorities is implied by the order of label keys.
+    # For example, ["zone", "rack"] means that we should place replicas to
+    # different zones first, then to different racks if we don't have enough zones.
+    location-labels = ["zone", "rack", "host"]
+
+  tidb-config: |-
+      # TiDB Configuration.
+
+      # TiDB server host.
+      host = "0.0.0.0"
+
+      # TiDB server port.
+      port = 4000
+
+      # Registered store name, [memory, goleveldb, boltdb, tikv, mocktikv]
+      store = "mocktikv"
+
+      # TiDB storage path.
+      path = "/tmp/tidb"
+
+      # The socket file to use for connection.
+      #socket = ""
+
+      # Socket file to write binlog.
+      #binlog-socket = ""
+
+      # Run ddl worker on this tidb-server.
+      run-ddl = true
+
+      # Schema lease duration, very dangerous to change only if you know what you do.
+      lease = "{{.TiDBLease}}s"
+
+      [log]
+      # Log level: info, debug, warn, error, fatal.
+      level = "info"
+
+      # Log format, one of json, text, console.
+      format = "text"
+
+      # Disable automatic timestamps in output
+      disable-timestamp = false
+
+      # Queries with execution time greater than this value will be logged. (Milliseconds)
+      slow-threshold = 300
+
+      # Maximum query length recorded in log.
+      query-log-max-len = 2048
+
+      # File logging.
+      [log.file]
+      # Log file name.
+      filename = ""
+
+      # Max log file size in MB.
+      #max-size = 300
+
+      # Max log file keep days.
+      #max-days = 28
+
+      # Maximum number of old log files to retain.
+      #max-backups = 7
+
+      # Rotate log by day
+      log-rotate = true
+
+      [security]
+      # This option causes the server to start without using the privilege system at all.
+      skip-grant-table = {{.SkipGrantTable}}
+
+      # Path of file that contains list of trusted SSL CAs.
+      ssl-ca = ""
+
+      # Path of file that contains X509 certificate in PEM format.
+      ssl-cert = ""
+
+      # Path of file that contains X509 key in PEM format.
+      ssl-key = ""
+
+      [status]
+      # If enable status report HTTP service.
+      report-status = true
+
+      # TiDB status port.
+      status-port = 10080
+
+      # Prometheus pushgateway address, leaves it empty will disable prometheus push.
+      metrics-addr = "{{.MetricsAddr}}"
+
+      # Prometheus client push interval in second, set \"0\" to disable prometheus push.
+      metrics-interval = 15
+
+      [performance]
+      # Set keep alive option for tcp connection.
+      tcp-keep-alive = true
+
+      # The maximum number of retries when commit a transaction.
+      retry-limit = 10
+
+      # The number of goroutines that participate joining.
+      join-concurrency = 5
+
+      # Whether support cartesian product.
+      cross-join = true
+
+      # Stats lease duration, which inflences the time of analyze and stats load.
+      stats-lease = "3s"
+
+      [xprotocol]
+      # Start TiDB x server.
+      xserver = false
+
+      # TiDB x protocol server host.
+      xhost = "0.0.0.0"
+
+      # TiDB x protocol server port.
+      xport = 14000
+
+      # The socket file to use for x protocol connection.
+      xsocket = ""
+
+  tikv-config: |-
+    # TiKV config template
+    #  Human-readable big numbers:
+    #   File size(based on byte): KB, MB, GB, TB, PB
+    #    e.g.: 1_048_576 = "1MB"
+    #   Time(based on ms): ms, s, m, h
+    #    e.g.: 78_000 = "1.3m"
+
+    # log level: trace, debug, info, warn, error, off.
+    log-level = "info"
+    # file to store log, write to stderr if it's empty.
+    # log-file = ""
+
+    [server]
+    # set listening address.
+    addr = "127.0.0.1:20160"
+    # set advertise listening address for client communication, if not set, use addr instead.
+    #advertise-addr = ""
+    # notify capacity, 40960 is suitable for about 7000 regions.
+    notify-capacity = 40960
+    # maximum number of messages can be processed in one tick.
+    messages-per-tick = 4096
+
+    # size of thread pool for grpc server.
+    # grpc-concurrency = 4
+    # The number of max concurrent streams/requests on a client connection.
+    # grpc-concurrent-stream = 1024
+    # The number of connections with each tikv server to send raft messages.
+    # grpc-raft-conn-num = 10
+    # Amount to read ahead on individual grpc streams.
+    # grpc-stream-initial-window-size = "2MB"
+
+    # size of thread pool for endpoint task, should less than total cpu cores.
+    {{ if eq .EndpointConcurrency 0 }}
+    # end-point-concurrency = 8
+    {{ else }}
+    end-point-concurrency = {{.EndpointConcurrency}}
+    {{ end }}
+
+    # set attributes about this server, e.g. { zone = "us-west-1", disk = "ssd" }.
+    labels = {}
+
+    [storage]
+    # set the path to rocksdb directory.
+    data-dir = "/tmp/tikv/store"
+    # notify capacity of scheduler's channel
+    # scheduler-notify-capacity = 10240
+
+    # maximum number of messages can be processed in one tick
+    # scheduler-messages-per-tick = 1024
+
+    # the number of slots in scheduler latches, concurrency control for write.
+    # scheduler-concurrency = 102400
+
+    # scheduler's worker pool size, should increase it in heavy write cases,
+    # also should less than total cpu cores.
+    # scheduler-worker-pool-size = 4
+
+    [pd]
+    # pd endpoints
+    endpoints = []
+
+    [metric]
+    # the Prometheus client push interval. Setting the value to 0s stops Prometheus client from pushing.
+    interval = "15s"
+    # the Prometheus pushgateway address. Leaving it empty stops Prometheus client from pushing.
+    address = "{{.MetricsAddr}}"
+    # the Prometheus client push job name. Note: A node id will automatically append, e.g., "tikv_1".
+    job = "tikv"
+
+    [raftstore]
+    # true (default value) for high reliability, this can prevent data loss when power failure.
+    sync-log = true
+
+    # set store capacity, if no set, use disk capacity.
+    # capacity = 0
+
+    # notify capacity, 40960 is suitable for about 7000 regions.
+    notify-capacity = 40960
+
+    # maximum number of messages can be processed in one tick.
+    messages-per-tick = 4096
+
+    # Region heartbeat tick interval for reporting to pd.
+    pd-heartbeat-tick-interval = "60s"
+    # Store heartbeat tick interval for reporting to pd.
+    pd-store-heartbeat-tick-interval = "10s"
+
+    # When the region's size exceeds region-max-size, we will split the region
+    # into two which the left region's size will be region-split-size or a little
+    # bit smaller.
+    region-max-size = "384MB"
+    region-split-size = "256MB"
+    # When region size changes exceeds region-split-check-diff, we should check
+    # whether the region should be split or not.
+    region-split-check-diff = "32MB"
+
+    # Interval to check region whether need to be split or not.
+    split-region-check-tick-interval = "10s"
+
+    # When raft entry exceed the max size, reject to propose the entry.
+    # raft-entry-max-size = "8MB"
+
+    # Interval to gc unnecessary raft log.
+    # raft-log-gc-tick-interval = "10s"
+    # A threshold to gc stale raft log, must >= 1.
+    # raft-log-gc-threshold = 50
+    # When entry count exceed this value, gc will be forced trigger.
+    # raft-log-gc-count-limit = 196608
+    # When the approximate size of raft log entries exceed this value, gc will be forced trigger.
+    # It's recommanded to set it to 3/4 of region-split-size.
+    # raft-log-gc-size-limit = "192MB"
+
+    # When a peer hasn't been active for max-peer-down-duration,
+    # we will consider this peer to be down and report it to pd.
+    max-peer-down-duration = "5m"
+
+    # Interval to check whether start manual compaction for a region,
+    # 0 is the default value, means disable manual compaction.
+    # region-compact-check-interval = "5m"
+    # When delete keys of a region exceeds the size, a compaction will be started.
+    # region-compact-delete-keys-count = 1000000
+    # Interval to check whether should start a manual compaction for lock column family,
+    # if written bytes reach lock-cf-compact-threshold for lock column family, will fire
+    # a manual compaction for lock column family.
+    # lock-cf-compact-interval = "10m"
+    # lock-cf-compact-bytes-threshold = "256MB"
+
+    # Interval (s) to check region whether the data are consistent.
+    # consistency-check-interval = 0
+
+    [rocksdb]
+    # RocksDB info log directory, if set, RocksDB will save the log in `info-log-dir/LOG`.
+    # info-log-dir = ""
+    # Maximal size of the info log, if new info log will be created if size is large than it.
+    # info-log-max-size = 0
+    # Time for the info log file to roll (in seconds).
+    # info-log-roll-time = "0s"
+
+    # Maximum number of concurrent background jobs (compactions and flushes)
+    # max-background-jobs = 8
+
+    # This value represents the maximum number of threads that will concurrently perform a
+    # compaction job by breaking it into multiple, smaller ones that are run simultaneously.
+    # Default: 1 (i.e. no subcompactions)
+    # max-sub-compactions = 1
+
+    # Number of open files that can be used by the DB.  You may need to
+    # increase this if your database has a large working set. Value -1 means
+    # files opened are always kept open. You can estimate number of files based
+    # on target_file_size_base and target_file_size_multiplier for level-based
+    # compaction.
+    # If max-open-files = -1, RocksDB will prefetch index and filter blocks into
+    # block cache at startup, so if your database has a large working set, it will
+    # take several minutes to open the db.
+    # max-open-files = 40960
+
+    # Max size of rocksdb's MANIFEST file.
+    # For detailed explanation please refer to https://github.com/facebook/rocksdb/wiki/MANIFEST
+    max-manifest-file-size = "20MB"
+
+    # If true, the database will be created if it is missing.
+    create-if-missing = true
+
+    # rocksdb wal recovery mode
+    # 0 : TolerateCorruptedTailRecords, tolerate incomplete record in trailing data on all logs;
+    # 1 : AbsoluteConsistency, We don't expect to find any corruption in the WAL;
+    # 2 : PointInTimeRecovery, Recover to point-in-time consistency;
+    # 3 : SkipAnyCorruptedRecords, Recovery after a disaster;
+    wal-recovery-mode = 2
+
+    # rocksdb write-ahead logs dir path
+    # This specifies the absolute dir path for write-ahead logs (WAL).
+    # If it is empty, the log files will be in the same dir as data.
+    # When you set the path to rocksdb directory in memory like in /dev/shm, you may want to set
+    # wal-dir to a directory on a persistent storage.
+    # See https://github.com/facebook/rocksdb/wiki/How-to-persist-in-memory-RocksDB-database
+    # wal-dir = "/tmp/tikv/store"
+
+    # The following two fields affect how archived write-ahead logs will be deleted.
+    # 1. If both set to 0, logs will be deleted asap and will not get into the archive.
+    # 2. If wal-ttl-seconds is 0 and wal-size-limit is not 0,
+    #    WAL files will be checked every 10 min and if total size is greater
+    #    then wal-size-limit, they will be deleted starting with the
+    #    earliest until size_limit is met. All empty files will be deleted.
+    # 3. If wal-ttl-seconds is not 0 and wal-size-limit is 0, then
+    #    WAL files will be checked every wal-ttl-seconds / 2 and those that
+    #    are older than wal-ttl-seconds will be deleted.
+    # 4. If both are not 0, WAL files will be checked every 10 min and both
+    #    checks will be performed with ttl being first.
+    # When you set the path to rocksdb directory in memory like in /dev/shm, you may want to set
+    # wal-ttl-seconds to a value greater than 0 (like 86400) and backup your db on a regular basis.
+    # See https://github.com/facebook/rocksdb/wiki/How-to-persist-in-memory-RocksDB-database
+    # wal-ttl-seconds = 0
+    # wal-size-limit = 0
+
+    # rocksdb max total wal size
+    # max-total-wal-size = "4GB"
+
+    # rocksdb writable file max buffer size
+    # writable-file-max-buffer-size = "1MB"
+
+    # Rocksdb Statistics provides cumulative stats over time.
+    # Turn statistics on will introduce about 5%-10% overhead for RocksDB,
+    # but it is worthy to know the internal status of RocksDB.
+    # enable-statistics = true
+
+    # Dump statistics periodically in information logs.
+    # Same as rocksdb's default value (10 min).
+    stats-dump-period = "10m"
+
+    # Due to Rocksdb FAQ: https://github.com/facebook/rocksdb/wiki/RocksDB-FAQ,
+    # If you want to use rocksdb on multi disks or spinning disks, you should set value at
+    # least 2MB;
+    # compaction-readahead-size = 0
+
+    # This is the maximum buffer size that is used by WritableFileWrite
+    # writable-file-max-buffer-size = "1MB"
+
+    # Use O_DIRECT for both reads and writes in background flush and compactions
+    # use-direct-io-for-flush-and-compaction = false
+
+    # Limit the disk IO of compaction and flush. Compaction and flush can cause
+    # terrible spikes if they exceed a certain threshold. Consider setting this to
+    # 50% ~ 80% of the disk throughput for a more stable result. However, in heavy
+    # write workload, limiting compaction and flush speed can cause write stalls too.
+    # rate-bytes-per-sec = 0
+
+    # Enable or disable the pipelined write
+    # enable-pipelined-write = true
+
+    # set backup path, if not set, use "backup" under store path.
+    # backup-dir = "/tmp/tikv/store/backup"
+
+    # Column Family default used to store actual data of the database.
+    [rocksdb.defaultcf]
+    # compression method (if any) is used to compress a block.
+    #   no:     kNoCompression
+    #   snappy: kSnappyCompression
+    #   zlib:   kZlibCompression
+    #   bzip2:  kBZip2Compression
+    #   lz4:    kLZ4Compression
+    #   lz4hc:  kLZ4HCCompression
+    #   zstd:   kZSTD
+
+    # per level compression
+    # compression-per-level = ["no", "no", "lz4", "lz4", "lz4", "zstd", "zstd"]
+
+    # Approximate size of user data packed per block.  Note that the
+    # block size specified here corresponds to uncompressed data.
+    # block-size = "64KB"
+
+    # If you're doing point lookups you definitely want to turn bloom filters on, We use
+    # bloom filters to avoid unnecessary disk reads. Default bits_per_key is 10, which
+    # yields ~1% false positive rate. Larger bits_per_key values will reduce false positive
+    # rate, but increase memory usage and space amplification.
+    # bloom-filter-bits-per-key = 10
+
+    # false means one sst file one bloom filter, true means evry block has a corresponding bloom filter
+    # block-based-bloom-filter = false
+
+    # level0-file-num-compaction-trigger = 4
+
+    # Soft limit on number of level-0 files. We start slowing down writes at this point.
+    # level0-slowdown-writes-trigger = 20
+
+    # Maximum number of level-0 files.  We stop writes at this point.
+    # level0-stop-writes-trigger = 36
+
+    # Amount of data to build up in memory (backed by an unsorted log
+    # on disk) before converting to a sorted on-disk file.
+    # write-buffer-size = "128MB"
+
+    # The maximum number of write buffers that are built up in memory.
+    # max-write-buffer-number = 5
+
+    # The minimum number of write buffers that will be merged together
+    # before writing to storage.
+    # min-write-buffer-number-to-merge = 1
+
+    # Control maximum total data size for base level (level 1).
+    # max-bytes-for-level-base = "512MB"
+
+    # Target file size for compaction.
+    # target-file-size-base = "32MB"
+
+    # Max bytes for compaction.max_compaction_bytes
+    # max-compaction-bytes = "2GB"
+
+    # There are four different algorithms to pick files to compact.
+    # 0 : ByCompensatedSize
+    # 1 : OldestLargestSeqFirst
+    # 2 : OldestSmallestSeqFirst
+    # 3 : MinOverlappingRatio
+    # compaction-pri = 3
+
+    # block-cache used to cache uncompressed blocks, big block-cache can speed up read.
+    # in normal cases should tune to 30%-50% system's total memory.
+    {{ if eq .DefaultCFBlockCacheSize ""}}
+    # block-cache-size = "1GB"
+    {{ else }}
+    block-cache-size = "{{.DefaultCFBlockCacheSize}}"
+    {{ end }}
+
+    # Indicating if we'd put index/filter blocks to the block cache.
+    # If not specified, each "table reader" object will pre-load index/filter block
+    # during table initialization.
+    # cache-index-and-filter-blocks = true
+
+    # Options for Column Family write
+    # Column Family write used to store commit informations in MVCC model
+    [rocksdb.writecf]
+    # compression-per-level = ["no", "no", "lz4", "lz4", "lz4", "zstd", "zstd"]
+    # block-size = "64KB"
+    # write-buffer-size = "128MB"
+    # max-write-buffer-number = 5
+    # min-write-buffer-number-to-merge = 1
+    # max-bytes-for-level-base = "512MB"
+    # target-file-size-base = "32MB"
+
+    # in normal cases should tune to 10%-30% system's total memory.
+    {{ if eq .WriteCFBlockCacheSize "" }}
+    # block-cache-size = "256MB"
+    {{ else }}
+    block-cache-size = "{{.WriteCFBlockCacheSize}}"
+    {{ end }}
+    # cache-index-and-filter-blocks = true
+    # level0-file-num-compaction-trigger = 4
+    # level0-slowdown-writes-trigger = 20
+    # level0-stop-writes-trigger = 36
+    # cache-index-and-filter-blocks = true
+    # compaction-pri = 3
+
+    # options for Column Family raft.
+    # Column Family raft is used to store raft log and raft states.
+    [rocksdb.raftcf]
+    # compression-per-level = ["no", "no", "lz4", "lz4", "lz4", "zstd", "zstd"]
+    # block-size = "64KB"
+    # write-buffer-size = "128MB"
+    # max-write-buffer-number = 5
+    # min-write-buffer-number-to-merge = 1
+    # max-bytes-for-level-base = "512MB"
+    # target-file-size-base = "32MB"
+
+    # should tune to 256MB~2GB.
+    block-cache-size = "2GB"
+    # level0-file-num-compaction-trigger = 4
+    # level0-slowdown-writes-trigger = 20
+    # level0-stop-writes-trigger = 36
+    # cache-index-and-filter-blocks = true
+    # compaction-pri = 0
+
+    [rocksdb.lockcf]
+    # compression-per-level = ["no", "no", "no", "no", "no", "no", "no"]
+    # block-size = "16KB"
+    # write-buffer-size = "128MB"
+    # max-write-buffer-number = 5
+    # min-write-buffer-number-to-merge = 1
+    # max-bytes-for-level-base = "128MB"
+    # target-file-size-base = "32MB"
+    block-cache-size = "2GB"
+    # level0-file-num-compaction-trigger = 1
+    # level0-slowdown-writes-trigger = 20
+    # level0-stop-writes-trigger = 36
+    # cache-index-and-filter-blocks = true
+    # compaction-pri = 0
+
+  prometheus-config: |-
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+      labels:
+        monitor: 'prometheus'
+    scrape_configs:
+      - job_name: 'tidb-cluster'
+        scrape_interval: 5s
+        honor_labels: true
+        static_configs:
+          - targets: ['127.0.0.1:9091']
+            labels:
+              cluster: 'tidb-cluster'
+    rule_files:
+      - 'alert.rules'
+
+  alert-rules-config: |-
+    # TiDB
+
+    ALERT load_schema_fail
+      IF rate(tidb_domain_load_schema_total{type='failed'}[1m]) > 0
+      FOR 1s
+      LABELS { env = "{{.ClusterName}}" }
+      ANNOTATIONS {
+        summary = "TiDB load schema fails",
+        description = "alert: rate(tidb_domain_load_schema_total{type='failed'} instance: {{.MetaInstance}} values: {{.MetaValue}}",
+      }
+
+    ALERT local_shema_latency
+      IF histogram_quantile(1, rate(tidb_domain_load_schema_duration_bucket[5m])) > 5
+      FOR 1m
+      LABELS { env = "{{.ClusterName}}" }
+      ANNOTATIONS {
+        summary = "TiDB load schema latency is over 5s",
+        description = "alert: histogram_quantile(1, rate(tidb_domain_load_schema_duration_bucket [5m])) instance: {{.MetaInstance}}  values: {{.MetaValue}}",
+      }
+
+    ALERT memery_abnormal
+      IF go_memstats_heap_inuse_bytes{job='tidb'} > 1000000000
+      FOR 10m
+      LABELS { env = "{{.ClusterName}}" }
+      ANNOTATIONS {
+        summary = "TiDB mem heap is over 1GiB",
+        description = "alert: go_memstats_heap_inuse_bytes{job='tidb'} instance: {{.MetaInstance}}  values: {{.MetaValue}}",
+      }
+
+    ALERT tidb_query_duration
+      IF histogram_quantile(0.99, sum(rate(tidb_server_handle_query_duration_seconds_bucket[1m])) by (le, instance)) > 1
+      FOR 5s
+      LABELS { env = "{{.ClusterName}}" }
+      ANNOTATIONS {
+          summary = "TiDB query duration 99th percentile is above 1s",
+          description = "instance: {{.MetaInstance}} values: {{.MetaValue}} alert: histogram_quantile(0.99, sum(rate(tidb_server_handle_query_duration_seconds_bucket[1m])) by (le, instance)) > 1 .",
+      }
+
+    ALERT tidb_tikvclient_region_err
+      IF sum(rate(tidb_tikvclient_region_err_total{type='server_is_busy'}[1m])) > 0
+      FOR 1m
+      LABELS { env = "{{.ClusterName}}", channels = "alerts" }
+      ANNOTATIONS {
+          summary = "TiDB server is busy",
+          description = "alert: sum(rate(tidb_tikvclient_region_err_total{type='server_is_busy'}[1m])) instance: {{.MetaInstance}} values: {{.MetaValue}}",
+      }
+
+    # TiKV
+    ALERT tikv_raft_process_ready
+      IF sum(rate(tikv_raftstore_raft_process_nanos_total{type='ready'}[1m])) by (type, instance) / 1000000000 > 1
+      FOR 1m
+      LABELS { env = "{{.ClusterName}}" , channels = 'alerts'}
+      ANNOTATIONS {
+        summary = "TiKV raft process ready duration is above 1s",
+        description = "alert: sum(rate(tikv_raftstore_raft_process_nanos_total{type='ready'[1m])) by (type, instance) / 1000000000 instance: {{.MetaInstance}} values: {{.MetaValue}}",
+      }
+
+    ALERT raft_sotre_msg
+      IF sum(rate(tikv_server_report_failure_msg_total{type='unreachable'}[1m])) > 10
+      FOR 1m
+      LABELS {env = "{{.ClusterName}}", channels= 'alerts' }
+      ANNOTATIONS {
+        summary = "TiKV too many unreachable raft stores",
+        description = "alert: sum(rate(tikv_server_raft_store_msg_total{type='unreachable'}[1m])) > 10  values:{{.MetaValue}}"
+      }
+
+    ALERT tikv_channel_full_total
+      IF sum(rate(tikv_channel_full_total[1m])) by (type, instance) > 0
+      FOR 1s
+      LABELS { env = "{{.ClusterName}}" , channels='alerts'}
+      ANNOTATIONS {
+        summary = "TiKV channel full",
+        description = "alert: sum(rate(tikv_channel_full_total[1m])) by (type, instance)  instance: {{.MetaInstance}}  values: {{.MetaValue}}",
+      }
+
+    ALERT coprocessor_pending_request
+      IF sum(rate(tikv_coprocessor_pending_request[1m])) by (type,instance) > 2
+      FOR 10s
+      LABELS { env = "{{.ClusterName}}" }
+      ANNOTATIONS {
+        summary = "TiKV pending {{.MetaType}} request is high",
+        description = "alert: sum(rate(tikv_coprocessor_pending_request[1m])) by (type,instance) > 2 type: {{.MetaType}} instance: {{.MetaInstance}}  values: {{.MetaValue}}",
+      }
+
+    ALERT tikv_scheduler_context_total
+      IF sum(tikv_scheduler_contex_total) by (job) > 300
+      FOR 2m
+      LABELS { env = "{{.ClusterName}}" }
+      ANNOTATIONS {
+        summary = "TiKV scheduler context total",
+        description = "alert: sum(tikv_scheduler_contex_total) by (job) > 300 instance: {{.MetaInstance}}  values: {{.MetaValue}}",
+      }
+
+    ALERT tikv_thread_cpu_seconds_total
+      IF rate(tikv_thread_cpu_seconds_total{name='raftstore'}[1m]) > 0.8
+      FOR 1m
+      LABELS { env = "{{.ClusterName}}" }
+      ANNOTATIONS {
+        summary = "TiKV raftstore thread CPU seconds is high",
+          description = "alert: rate(tikv_thread_cpu_seconds_total{name='raftstore'}[1m]) > 0.8 instance {{.MetaInstance}} values: {{.MetaValue}}",
+      }
+
+    ALERT tikv_thread_cpu_seconds_total
+      IF rate(tikv_thread_cpu_seconds_total{name='endpoint-pool'}[1m]) > 0.9
+      FOR 1m
+      LABELS { env = "{{.ClusterName}}" }
+      ANNOTATIONS {
+        summary = "TiKV endpoint-pool thread CPU seconds is high",
+        description = "alert: rate(tikv_thread_cpu_seconds_total{name='endpoint-pool'}[1m]) > 0.9 instance {{.MetaInstance}} values: {{.MetaValue}}",
+      }
+
+    ALERT tikv_thread_cpu_seconds_total
+      IF rate(tikv_thread_cpu_seconds_total{name='sched-worker-pool'}[1m]) > 0.9
+      FOR 1m
+      LABELS { env = "{{.ClusterName}}" }
+      ANNOTATIONS {
+        summary = "TiKV sched-worker-pool thread CPU seconds is high",
+        description = "alert: rate(tikv_thread_cpu_seconds_total{name='sched-worker-pool'}[1m]) > 0.9 instance {{.MetaInstance}} values: {{.MetaValue}}",
+      }
+
+    ALERT tikv_leader_drops
+      IF delta(tikv_pd_heartbeat_tick_total{type="leader"}[30s]) < -10
+      FOR 1s
+      LABELS { env = "{{.ClusterName}}", channels = "alerts" }
+      ANNOTATIONS {
+        summary = "TiKV leader drops",
+        description = "alert: delta(tikv_pd_heartbeat_tick_total{type='leader'}[30s]) > 10 instance: {{.MetaInstance}}   values:{{.MetaValue}}",
+      }
+
+    # PD
+    ALERT etcd_disk_fsync
+      IF sum(rate(etcd_disk_wal_fsync_duration_seconds_count[1m])) by (instance) == 0
+      FOR 1m
+      LABELS { env = "{{.ClusterName}}", channels = "alerts" }
+      ANNOTATIONS {
+        summary = "PD etcd disk fsync is down",
+        description = "alert: sum(rate(etcd_disk_wal_fsync_duration_seconds_count[1m])) by (instance) instance: {{.MetaInstance}}   values:{{.MetaValue}}",
+    }

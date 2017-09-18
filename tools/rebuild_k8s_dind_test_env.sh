@@ -88,7 +88,6 @@ case "${1:-rebuild}" in
         rebuild::up_dind
         rebuild::start_registry
         rebuild::deploy_apps
-        rebuild::push_images_to_local
         ;;
     push)
         rebuild::push_images_to_local

@@ -427,7 +427,7 @@ function dind::run {
 
   ####### expose registry port ########
   if [[ "${container_name}" = "kube-master" ]]; then
-    opts+=(-p 127.0.0.1:5000:5001)
+    opts+=(-p 127.0.0.1:5000:5001 -p 127.0.0.1:32333:2333)
   fi
 
   if [[ ${CNI_PLUGIN} = bridge && ${netshift} ]]; then

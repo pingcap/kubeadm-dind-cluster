@@ -16,7 +16,7 @@
     },
     "monitor": {
         "size": 1,
-        "version": "4.2.0,v1.5.2,v0.3.1,v0.1.0"
+        "version": "4.2.0,v1.5.2,v0.3.1,v1.0.0"
     },
     "monitor_reserve_days": 35,
     "root_password": "pingcap123456"

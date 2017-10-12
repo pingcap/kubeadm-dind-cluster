@@ -66,6 +66,7 @@ SKIP_SNAPSHOT="${SKIP_SNAPSHOT:-}"
 E2E_REPORT_DIR="${E2E_REPORT_DIR:-}"
 DIND_NO_PARALLEL_E2E="${DIND_NO_PARALLEL_E2E:-}"
 KUBE_REPO_PREFIX="${KUBE_REPO_PREFIX:-uhub.service.ucloud.cn/pingcap}"
+KUBERNETES_VERSION="${KUBERNETES_VERSION:-v1.7.8}"
 
 if [[ ! ${LOCAL_KUBECTL_VERSION:-} && ${DIND_IMAGE:-} =~ :(v[0-9]+\.[0-9]+)$ ]]; then
   LOCAL_KUBECTL_VERSION="${BASH_REMATCH[1]}"
@@ -579,7 +580,7 @@ EOF
   else
     init_args=(--pod-network-cidr="${POD_NETWORK_CIDR}")
   fi
-  kubeadm_join_flags="$(dind::kubeadm "${container_id}" init "${init_args[@]}" --skip-preflight-checks "$@" | grep '^ *kubeadm join' | sed 's/^ *kubeadm join //')"
+  kubeadm_join_flags="$(dind::kubeadm "${container_id}" init "${init_args[@]}" --kubernetes-version="${KUBERNETES_VERSION}" --skip-preflight-checks "$@" | grep '^ *kubeadm join' | sed 's/^ *kubeadm join //')"
   dind::configure-kubectl
   dind::deploy-dashboard
 }

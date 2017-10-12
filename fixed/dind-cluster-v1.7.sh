@@ -61,6 +61,7 @@ DASHBOARD_URL="${DASHBOARD_URL:-${DIND_ROOT}/manifests/kubernetes-dashboard.yaml
 SKIP_SNAPSHOT="${SKIP_SNAPSHOT:-}"
 E2E_REPORT_DIR="${E2E_REPORT_DIR:-}"
 KUBE_REPO_PREFIX="${KUBE_REPO_PREFIX:-uhub.service.ucloud.cn/pingcap}"
+KUBERNETES_VERSION="${KUBERNETES_VERSION:-v1.7.8}"
 
 if [[ ! ${LOCAL_KUBECTL_VERSION:-} && ${DIND_IMAGE:-} =~ :(v[0-9]+\.[0-9]+)$ ]]; then
   LOCAL_KUBECTL_VERSION="${BASH_REMATCH[1]}"
@@ -544,7 +545,7 @@ function dind::init {
   # FIXME: I tried using custom tokens with 'kubeadm ex token create' but join failed with:
   # 'failed to parse response as JWS object [square/go-jose: compact JWS format must have three parts]'
   # So we just pick the line from 'kubeadm init' output
-  kubeadm_join_flags="$(dind::kubeadm "${container_id}" init --pod-network-cidr="${POD_NETWORK_CIDR}" --skip-preflight-checks "$@" | grep '^ *kubeadm join' | sed 's/^ *kubeadm join //')"
+  kubeadm_join_flags="$(dind::kubeadm "${container_id}" init --kubernetes-version="${KUBERNETES_VERSION}" --pod-network-cidr="${POD_NETWORK_CIDR}" --skip-preflight-checks "$@" | grep '^ *kubeadm join' | sed 's/^ *kubeadm join //')"
   dind::configure-kubectl
   dind::deploy-dashboard
 }

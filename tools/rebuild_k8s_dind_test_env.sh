@@ -2,7 +2,7 @@
 
 
 REGISTRY=localhost:5000/pingcap
-SOURCE_REGISTRY=uhub.service.ucloud.cn/pingcap
+SOURCE_REGISTRY=uhub.ucloud.cn/pingcap
 INIT_DEPLOYS="registry-proxy.yaml"
 TIDB_IMAGES="tidb tikv pd"
 IMAGES="tidb-tools:latest tidb-dashboard-installer:v1.0.0 grafana:4.2.0 prometheus:v1.5.2 pushgateway:v0.3.1"

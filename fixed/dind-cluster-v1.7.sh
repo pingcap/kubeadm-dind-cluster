@@ -65,7 +65,7 @@ DASHBOARD_URL="${DASHBOARD_URL:-${DIND_ROOT}/manifests/kubernetes-dashboard.yaml
 SKIP_SNAPSHOT="${SKIP_SNAPSHOT:-}"
 E2E_REPORT_DIR="${E2E_REPORT_DIR:-}"
 DIND_NO_PARALLEL_E2E="${DIND_NO_PARALLEL_E2E:-}"
-KUBE_REPO_PREFIX="${KUBE_REPO_PREFIX:-uhub.service.ucloud.cn/pingcap}"
+KUBE_REPO_PREFIX="${KUBE_REPO_PREFIX:-uhub.ucloud.cn/pingcap}"
 KUBERNETES_VERSION="${KUBERNETES_VERSION:-v1.7.8}"
 
 if [[ ! ${LOCAL_KUBECTL_VERSION:-} && ${DIND_IMAGE:-} =~ :(v[0-9]+\.[0-9]+)$ ]]; then

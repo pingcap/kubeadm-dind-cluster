@@ -136,7 +136,7 @@ spec:
     spec:
       containers:
       - name: influxdb
-        image: uhub.service.ucloud.cn/pingcap/heapster-influxdb-amd64:v1.1.1
+        image: uhub.ucloud.cn/pingcap/heapster-influxdb-amd64:v1.1.1
         volumeMounts:
         - mountPath: /data
           name: influxdb-storage

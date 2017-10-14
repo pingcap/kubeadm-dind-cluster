@@ -11,7 +11,7 @@ metadata:
 spec:
   pd:
     size: 3
-    image: uhub.service.ucloud.cn/pingcap/pd:latest
+    image: uhub.ucloud.cn/pingcap/pd:latest
     # # If resource constraints or custom schedules are required, please uncomment the following lines of code
     # limits:
     #   cpu: "1.5"   # quantity and unit format follows kubernetes convention
@@ -27,7 +27,7 @@ spec:
     #   region: "cn-bj1,cn-bj2"
   tidb:
     size: 2
-    image: uhub.service.ucloud.cn/pingcap/tidb:latest
+    image: uhub.ucloud.cn/pingcap/tidb:latest
     # limits:
     #   cpu: "12"
     #   memory: 25Gi
@@ -38,7 +38,7 @@ spec:
     #   storage: "0"
   tikv:
     size: 3
-    image: uhub.service.ucloud.cn/pingcap/tikv:latest
+    image: uhub.ucloud.cn/pingcap/tikv:latest
     # limits:
     #   cpu: "10"
     #   memory: 20Gi

@@ -98,7 +98,7 @@ spec:
       serviceAccount: tidb-cloud-manager
       containers:
       - name: tidb-cloud-manager
-        image: uhub.service.ucloud.cn/pingcap/tidb-cloud-manager:latest
+        image: uhub.ucloud.cn/pingcap/tidb-cloud-manager:latest
         command: ["/usr/local/bin/tidb-cloud-manager"]
         args:
           - -L=debug

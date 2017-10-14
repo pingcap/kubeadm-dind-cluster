@@ -34,7 +34,7 @@ function rebuild::up_dind {
 
 function rebuild::start_registry {
     rebuild::step "start to bringing up local registry in k8s cluster"
-    docker exec kube-master docker run -d --restart=always -v /registry:/var/lib/registry -p5001:5000 --name=registry uhub.service.ucloud.cn/pingcap/registry:2
+    docker exec kube-master docker run -d --restart=always -v /registry:/var/lib/registry -p5001:5000 --name=registry uhub.ucloud.cn/pingcap/registry:2
 }
 
 function rebuild::deploy_apps {

@@ -21,7 +21,7 @@ spec:
       serviceAccountName: heapster
       containers:
       - name: heapster
-        image: uhub.service.ucloud.cn/pingcap/heapster-amd64:v1.3.0
+        image: uhub.ucloud.cn/pingcap/heapster-amd64:v1.3.0
         imagePullPolicy: IfNotPresent
         command:
         - /heapster

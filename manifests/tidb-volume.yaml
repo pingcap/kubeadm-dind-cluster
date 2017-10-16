@@ -4,191 +4,98 @@ metadata:
   namespace: pingcap
   name: tidb-volume
 data:
-  # Important: all paths bellow must be sub directory of /tidb, because tidb-volume-manager can only manage directories under /tidb
+  ########################################################################################################################
+  # All paths bellow must be sub directory of /tidb, because tidb-volume-manager can only manage directories under /tidb #
+  ########################################################################################################################
   volume: |-
-    {
-        "nodes": [
-           {
-               "name": "kube-node-1",
-               "directories": [
-                   {
-                       "path": "/tidb/tikv-dir-1",
-                       "size": "100Gi"
-                   },
-                   {
-                       "path": "/tidb/tikv-dir-2",
-                       "size": "100Gi"
-                   }
-               ]
-           },
-           {
-               "name": "kube-node-2",
-               "directories": [
-                   {
-                       "path": "/tidb/tikv-dir-1",
-                       "size": "50Gi"
-                   },
-                   {
-                       "path": "/tidb/tikv-dir-2",
-                       "size": "50Gi"
-                   }
-               ]
-           },
-           {
-               "name": "kube-node-3",
-               "directories": [
-                   {
-                       "path": "/tidb/tikv-dir-1",
-                       "size": "50Gi"
-                   },
-                   {
-                       "path": "/tidb/tikv-dir-2",
-                       "size": "50Gi"
-                   }
-               ]
-           },
-           {
-               "name": "kube-node-4",
-               "directories": [
-                   {
-                       "path": "/tidb/tikv-dir-1",
-                       "size": "50Gi"
-                   },
-                   {
-                       "path": "/tidb/tikv-dir-2",
-                       "size": "50Gi"
-                   }
-               ]
-           },
-           {
-               "name": "kube-node-5",
-               "directories": [
-                   {
-                       "path": "/tidb/tikv-dir-1",
-                       "size": "50Gi"
-                   },
-                   {
-                       "path": "/tidb/tikv-dir-2",
-                       "size": "50Gi"
-                   }
-               ]
-           },
-           {
-               "name": "kube-node-6",
-               "directories": [
-                   {
-                       "path": "/tidb/tikv-dir-1",
-                       "size": "50Gi"
-                   },
-                   {
-                       "path": "/tidb/tikv-dir-2",
-                       "size": "50Gi"
-                   }
-               ]
-           },
-           {
-               "name": "kube-node-7",
-               "directories": [
-                   {
-                       "path": "/tidb/tikv-dir-1",
-                       "size": "50Gi"
-                   },
-                   {
-                       "path": "/tidb/tikv-dir-2",
-                       "size": "50Gi"
-                   }
-               ]
-           },
-           {
-               "name": "kube-node-8",
-               "directories": [
-                   {
-                       "path": "/tidb/tikv-dir-1",
-                       "size": "50Gi"
-                   },
-                   {
-                       "path": "/tidb/tikv-dir-2",
-                       "size": "50Gi"
-                   }
-               ]
-           },
-           {
-               "name": "kube-node-9",
-               "directories": [
-                   {
-                       "path": "/tidb/tikv-dir-1",
-                       "size": "50Gi"
-                   },
-                   {
-                       "path": "/tidb/tikv-dir-2",
-                       "size": "50Gi"
-                   }
-               ]
-           },
-           {
-               "name": "kube-node-10",
-               "directories": [
-                   {
-                       "path": "/tidb/tikv-dir-1",
-                       "size": "50Gi"
-                   },
-                   {
-                       "path": "/tidb/tikv-dir-2",
-                       "size": "50Gi"
-                   }
-               ]
-           },
-           {
-               "name": "kube-node-11",
-               "directories": [
-                   {
-                       "path": "/tidb/tikv-dir-1",
-                       "size": "50Gi"
-                   },
-                   {
-                       "path": "/tidb/tikv-dir-2",
-                       "size": "50Gi"
-                   }
-               ]
-           },
-           {
-               "name": "kube-node-12",
-               "directories": [
-                   {
-                       "path": "/tidb/tikv-dir-1",
-                       "size": "50Gi"
-                   },
-                   {
-                       "path": "/tidb/tikv-dir-2",
-                       "size": "50Gi"
-                   }
-               ]
-           },
-           {
-               "name": "kube-node-13",
-               "directories": [
-                   {
-                       "path": "/tidb/tikv-dir-1",
-                       "size": "50Gi"
-                   },
-                   {
-                       "path": "/tidb/tikv-dir-2",
-                       "size": "50Gi"
-                   }
-               ]
-           },
-           {
-               "name": "kube-node-14",
-               "directories": [
-                   {
-                       "path": "/tidb/tikv-dir-1",
-                       "size": "50Gi"
-                   },
-                   {
-                       "path": "/tidb/tikv-dir-2",
-                       "size": "50Gi"
-                   }
-               ]
-           }
-        ]
-    }
+    nodes:
+    - name: kube-node-1
+      directories:
+      - path: /tidb/tikv-dir-1
+        size: 100Gi # size doesn't have to match the disk real size, it's only used for scheduling
+      - path: /tidb/tikv-dir-2
+        size: 100Gi
+      - path: /tidb/pd-dir-1
+        size: 2Gi
+    - name: kube-node-2
+      directories:
+      - path: /tidb/tikv-dir-1
+        size: 50Gi
+      - path: /tidb/tikv-dir-2
+        size: 50Gi
+      - path: /tidb/pd-dir-2
+        size: 2Gi
+    - name: kube-node-3
+      directories:
+      - path: /tidb/tikv-dir-1
+        size: 50Gi
+      - path: /tidb/tikv-dir-2
+        size: 50Gi
+      - path: /tidb/pd-dir-3
+        size: 2Gi
+    - name: kube-node-4
+      directories:
+      - path: /tidb/tikv-dir-1
+        size: 50Gi
+      - path: /tidb/tikv-dir-2
+        size: 50Gi
+    - name: kube-node-5
+      directories:
+      - path: /tidb/tikv-dir-1
+        size: 50Gi
+      - path: /tidb/tikv-dir-2
+        size: 50Gi
+    - name: kube-node-6
+      directories:
+      - path: /tidb/tikv-dir-1
+        size: 50Gi
+      - path: /tidb/tikv-dir-2
+        size: 50Gi
+    - name: kube-node-7
+      directories:
+      - path: /tidb/tikv-dir-1
+        size: 50Gi
+      - path: /tidb/tikv-dir-2
+        size: 50Gi
+    - name: kube-node-8
+      directories:
+      - path: /tidb/tikv-dir-1
+        size: 50Gi
+      - path: /tidb/tikv-dir-2
+        size: 50Gi
+    - name: kube-node-9
+      directories:
+      - path: /tidb/tikv-dir-1
+        size: 50Gi
+      - path: /tidb/tikv-dir-2
+        size: 50Gi
+    - name: kube-node-10
+      directories:
+      - path: /tidb/tikv-dir-1
+        size: 50Gi
+      - path: /tidb/tikv-dir-2
+        size: 50Gi
+    - name: kube-node-11
+      directories:
+      - path: /tidb/tikv-dir-1
+        size: 50Gi
+      - path: /tidb/tikv-dir-2
+        size: 50Gi
+    - name: kube-node-12
+      directories:
+      - path: /tidb/tikv-dir-1
+        size: 50Gi
+      - path: /tidb/tikv-dir-2
+        size: 50Gi
+    - name: kube-node-13
+      directories:
+      - path: /tidb/tikv-dir-1
+        size: 50Gi
+      - path: /tidb/tikv-dir-2
+        size: 50Gi
+    - name: kube-node-14
+      directories:
+      - path: /tidb/tikv-dir-1
+        size: 50Gi
+      - path: /tidb/tikv-dir-2
+        size: 50Gi

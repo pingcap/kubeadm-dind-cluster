@@ -103,6 +103,7 @@ spec:
         args:
           - -L=debug
           - -repo-prefix=uhub.ucloud.cn/pingcap
+          - -retention-duration=0
           # - -alertmanagerURL=http://alertmanager.kube-system:9093
         env:
           - name: MY_POD_NAMESPACE

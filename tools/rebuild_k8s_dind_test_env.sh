@@ -5,6 +5,7 @@ REGISTRY=localhost:5000/pingcap
 SOURCE_REGISTRY=uhub.ucloud.cn/pingcap
 INIT_DEPLOYS="registry-proxy.yaml"
 TIDB_IMAGES="tidb tikv pd"
+TIDB_BASE_TAG="v1.0.0"
 IMAGES="tidb-tools:latest tidb-dashboard-installer:v1.0.0 grafana:4.2.0 prometheus:v1.5.2 pushgateway:v0.3.1"
 
 ### change workspace
@@ -66,17 +67,17 @@ function rebuild::push_images_to_local {
     for image in ${TIDB_IMAGES}
     do
         flag=0
-        docker pull ${SOURCE_REGISTRY}/${image}:latest || flag=1
+        docker pull ${SOURCE_REGISTRY}/${image}:${TIDB_BASE_TAG} || flag=1
         while [[ $flag -eq 1 ]]
         do
             flag=0
             sleep 5
-            docker pull ${SOURCE_REGISTRY}/${image}:latest || flag=1
+            docker pull ${SOURCE_REGISTRY}/${image}:${TIDB_BASE_TAG} || flag=1
             continue
         done
-        docker tag ${SOURCE_REGISTRY}/${image}:latest ${REGISTRY}/${image}:latest
-        docker tag ${SOURCE_REGISTRY}/${image}:latest ${REGISTRY}/${image}:master
-        docker push ${REGISTRY}/${image}:latest
+        docker tag ${SOURCE_REGISTRY}/${image}:${TIDB_BASE_TAG} ${REGISTRY}/${image}:${TIDB_BASE_TAG}
+        docker tag ${SOURCE_REGISTRY}/${image}:${TIDB_BASE_TAG} ${REGISTRY}/${image}:master
+        docker push ${REGISTRY}/${image}:${TIDB_BASE_TAG}
         docker push ${REGISTRY}/${image}:master
     done
 }

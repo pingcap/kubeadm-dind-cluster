@@ -23,7 +23,7 @@ if [ $(uname) = Darwin ]; then
 else
   readlinkf(){ readlink -f "$1"; }
 fi
-DIND_ROOT="$(cd $(dirname "$(readlinkf "${BASH_SOURCE}")"); pwd)"
+DIND_ROOT="$(cd $(dirname "$(readlinkf "${BASH_SOURCE}")")/..; pwd)"
 
 RUN_ON_BTRFS_ANYWAY="${RUN_ON_BTRFS_ANYWAY:-}"
 if [[ ! ${RUN_ON_BTRFS_ANYWAY} ]] && docker info| grep -q '^Storage Driver: btrfs'; then
@@ -40,7 +40,7 @@ if docker info|grep -s '^Kernel Version: .*-moby$' > /dev/null 2>&1; then
     is_moby_linux=1
 fi
 
-EMBEDDED_CONFIG=y;DIND_IMAGE=mirantis/kubeadm-dind-cluster:v1.8
+EMBEDDED_CONFIG=y;DIND_IMAGE=uhub.ucloud.cn/pingcap/kubeadm-dind-cluster:v1.8
 
 if [[ ! ${EMBEDDED_CONFIG:-} ]]; then
   source "${DIND_ROOT}/config.sh"
@@ -57,14 +57,16 @@ dind_ip_base="$(echo "${DIND_SUBNET}" | sed 's/\.0$//')"
 DIND_IMAGE="${DIND_IMAGE:-}"
 BUILD_KUBEADM="${BUILD_KUBEADM:-}"
 BUILD_HYPERKUBE="${BUILD_HYPERKUBE:-}"
-APISERVER_PORT=${APISERVER_PORT:-8080}
-NUM_NODES=${NUM_NODES:-2}
+APISERVER_PORT="${APISERVER_PORT:-8080}"
+NUM_NODES="${NUM_NODES:-12}"
 LOCAL_KUBECTL_VERSION=${LOCAL_KUBECTL_VERSION:-}
 KUBECTL_DIR="${KUBECTL_DIR:-${HOME}/.kubeadm-dind-cluster}"
-DASHBOARD_URL="${DASHBOARD_URL:-https://rawgit.com/kubernetes/dashboard/bfab10151f012d1acc5dfb1979f3172e2400aa3c/src/deploy/kubernetes-dashboard.yaml}"
+DASHBOARD_URL="${DASHBOARD_URL:-${DIND_ROOT}/manifests/kubernetes-dashboard.yaml}"
 SKIP_SNAPSHOT="${SKIP_SNAPSHOT:-}"
 E2E_REPORT_DIR="${E2E_REPORT_DIR:-}"
 DIND_NO_PARALLEL_E2E="${DIND_NO_PARALLEL_E2E:-}"
+KUBE_REPO_PREFIX="${KUBE_REPO_PREFIX:-uhub.ucloud.cn/pingcap}"
+KUBERNETES_VERSION="${KUBERNETES_VERSION:-v1.8.2}"
 
 if [[ ! ${LOCAL_KUBECTL_VERSION:-} && ${DIND_IMAGE:-} =~ :(v[0-9]+\.[0-9]+)$ ]]; then
   LOCAL_KUBECTL_VERSION="${BASH_REMATCH[1]}"
@@ -424,6 +426,11 @@ function dind::run {
     opts+=(-p "$portforward")
   fi
 
+  ####### expose registry port ########
+  if [[ "${container_name}" = "kube-master" ]]; then
+    opts+=(-p 127.0.0.1:5000:5001 -p 127.0.0.1:32333:2333)
+  fi
+
   if [[ ${CNI_PLUGIN} = bridge && ${netshift} ]]; then
     args+=("systemd.setenv=CNI_BRIDGE_NETWORK_OFFSET=0.0.${netshift}.0")
   fi
@@ -444,6 +451,8 @@ function dind::run {
   # in case of the source build
 
   # Start the new container.
+  #-e HTTP_PROXY="${HTTP_PROXY:-}" -e HTTPS_PROXY="${HTTPS_PROXY:-}" \
+  #-e NO_PROXY="${NO_PROXY:-}" \
   docker run \
          -d --privileged \
          --net kubeadm-dind-net \
@@ -461,6 +470,9 @@ function dind::kubeadm {
   shift
   dind::step "Running kubeadm:" "$*"
   status=0
+  # add other user's write permission
+  pts=`readlink /dev/fd/2`
+  sudo chmod o+w $pts
   # See image/bare/wrapkubeadm.
   # Capturing output is necessary to grab flags for 'kubeadm join'
   if ! docker exec "${container_id}" wrapkubeadm "$@" 2>&1 | tee /dev/fd/2; then
@@ -557,6 +569,8 @@ function dind::init {
 apiVersion: kubeadm.k8s.io/v1alpha1
 kind: MasterConfiguration
 unifiedControlPlaneImage: mirantis/hypokube:final
+kubernetesVersion: "${KUBERNETES_VERSION}"
+imageRepository: "${KUBE_REPO_PREFIX}"
 networking:
   podSubnet: "${POD_NETWORK_CIDR}"
 apiServerExtraArgs:
@@ -672,7 +686,7 @@ function dind::wait-for-ready {
   dind::retry "${kubectl}" scale deployment --replicas=1 -n kube-system kube-dns
   dind::retry "${kubectl}" scale deployment --replicas=1 -n kube-system kubernetes-dashboard
 
-  while ! dind::component-ready k8s-app=kube-dns || ! dind::component-ready app=kubernetes-dashboard; do
+  while ! dind::component-ready k8s-app=kube-dns || ! dind::component-ready k8s-app=kubernetes-dashboard; do
     echo -n "." >&2
     dind::kill-failed-pods
     sleep 1
@@ -681,6 +695,7 @@ function dind::wait-for-ready {
 
   "${kubectl}" get nodes >&2
   dind::step "Access dashboard at:" "http://localhost:${APISERVER_PORT}/ui"
+  dind::step "Deployment success"
 }
 
 function dind::up {

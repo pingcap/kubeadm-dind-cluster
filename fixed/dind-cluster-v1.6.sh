@@ -46,9 +46,13 @@ if [[ ! ${EMBEDDED_CONFIG:-} ]]; then
   source "${DIND_ROOT}/config.sh"
 fi
 
+DEFAULT_POD_NETWORK_CIDR="10.244.0.0/16"
+if [[ CNI_PLUGIN = "calico" || CNI_PLUGIN = "calico-kdd" ]]; then
+  DEFAULT_POD_NETWORK_CIDR="192.168.0.0/16"
+fi
 CNI_PLUGIN="${CNI_PLUGIN:-bridge}"
 DIND_SUBNET="${DIND_SUBNET:-10.192.0.0}"
-POD_NETWORK_CIDR="${POD_NETWORK_CIDR:-10.244.0.0/16}"
+POD_NETWORK_CIDR="${POD_NETWORK_CIDR:-${DEFAULT_POD_NETWORK_CIDR}}"
 dind_ip_base="$(echo "${DIND_SUBNET}" | sed 's/\.0$//')"
 DIND_IMAGE="${DIND_IMAGE:-}"
 BUILD_KUBEADM="${BUILD_KUBEADM:-}"
@@ -60,6 +64,7 @@ KUBECTL_DIR="${KUBECTL_DIR:-${HOME}/.kubeadm-dind-cluster}"
 DASHBOARD_URL="${DASHBOARD_URL:-https://rawgit.com/kubernetes/dashboard/bfab10151f012d1acc5dfb1979f3172e2400aa3c/src/deploy/kubernetes-dashboard.yaml}"
 SKIP_SNAPSHOT="${SKIP_SNAPSHOT:-}"
 E2E_REPORT_DIR="${E2E_REPORT_DIR:-}"
+DIND_NO_PARALLEL_E2E="${DIND_NO_PARALLEL_E2E:-}"
 
 if [[ ! ${LOCAL_KUBECTL_VERSION:-} && ${DIND_IMAGE:-} =~ :(v[0-9]+\.[0-9]+)$ ]]; then
   LOCAL_KUBECTL_VERSION="${BASH_REMATCH[1]}"
@@ -90,6 +95,14 @@ else
   fi
   kubectl=kubectl
 fi
+
+function dind::retry {
+  # based on retry function in hack/jenkins/ scripts in k8s source
+  for i in {1..10}; do
+    "$@" && return 0 || sleep ${i}
+  done
+  "$@"
+}
 
 busybox_image="busybox:1.26.2"
 e2e_base_image="golang:1.7.1"
@@ -278,20 +291,20 @@ function dind::ensure-downloaded-kubectl {
   local full_kubectl_version
 
   case "${LOCAL_KUBECTL_VERSION}" in
-    v1.5)
-      full_kubectl_version=v1.5.4
-      kubectl_sha1_linux=15d8430dc52b1f3772b88bc6a236c8fa58e07c0d
-      kubectl_sha1_darwin=5e671ba792567574eea48be4eddd844ba2f07c27
-      ;;
     v1.6)
-      full_kubectl_version=v1.6.6
-      kubectl_sha1_linux=41153558717f3206d37f5bf34232a303ae4dade1
-      kubectl_sha1_darwin=9795098e7340764b96a83e50676886d29e792033
+      full_kubectl_version=v1.6.9
+      kubectl_sha1_linux=5a26d1ad9712ff7117e24dc5408bf3a816489758
+      kubectl_sha1_darwin=ddf88f8c8b0a97ed3f599920f2f2de2cc3efb599
       ;;
     v1.7)
-      full_kubectl_version=v1.7.0
-      kubectl_sha1_linux=c92ec52c02ec10a1ab54132d3cc99ad6f68c530e
-      kubectl_sha1_darwin=2e2708b873accafb1be8f328008e3d41a6a32c08
+      full_kubectl_version=v1.7.8
+      kubectl_sha1_linux=0c3a28ac6551ee340b838e406f32fafe3124a5d5
+      kubectl_sha1_darwin=6049f0353dc37313a16775374ace23439594a7ca
+      ;;
+    v1.8)
+      full_kubectl_version=v1.8.1
+      kubectl_sha1_linux=e3e5d59be033ea6b46cfb65d6f8a0861e5c6322a
+      kubectl_sha1_darwin=c0f49bafa683740541d28f7fd0a0b00147f1d159
       ;;
     "")
       return 0
@@ -500,27 +513,28 @@ function dind::set-master-opts {
   fi
 }
 
-cached_use_rbac=
-function dind::use-rbac {
-  # we use rbac in case of k8s 1.6
-  if [[ ${cached_use_rbac} ]]; then
-    [[ ${cached_use_rbac} = 1 ]] && return 0 || return 1
+cached_k8s_version=
+function dind::k8s-version {
+  if [[ ! ${cached_k8s_version} ]]; then
+    cached_k8s_version="$("${kubectl}" version --short | grep 'Server Version' | sed 's/.*: v\|\.[0-9]*$//g')"
   fi
-  cached_use_rbac=0
-  if "${kubectl}" version --short >& /dev/null && ! "${kubectl}" version --short | grep -q 'Server Version: v1\.5\.'; then
-    cached_use_rbac=1
-    return 0
-  fi
-  return 1
+  echo "${cached_k8s_version}"
 }
 
 function dind::deploy-dashboard {
   dind::step "Deploying k8s dashboard"
   "${kubectl}" create -f "${DASHBOARD_URL}"
-  if dind::use-rbac; then
-    # https://kubernetes-io-vnext-staging.netlify.com/docs/admin/authorization/rbac/#service-account-permissions
-    # Thanks @liggitt for the hint
-    "${kubectl}" create clusterrolebinding add-on-cluster-admin --clusterrole=cluster-admin --serviceaccount=kube-system:default
+  # https://kubernetes-io-vnext-staging.netlify.com/docs/admin/authorization/rbac/#service-account-permissions
+  # Thanks @liggitt for the hint
+  "${kubectl}" create clusterrolebinding add-on-cluster-admin --clusterrole=cluster-admin --serviceaccount=kube-system:default
+}
+
+function dind::at-least-kubeadm-1-8 {
+  # kubeadm 1.6 and below doesn't support 'version -o short' and will
+  # thus produce an empty string
+  local ver="$(docker exec kube-master kubeadm version -o short 2>/dev/null|sed 's/[^0-9]*\.[0-9]*$//')"
+  if [[ ! ${ver} || ${ver} = v1.7 ]]; then
+    return 1
   fi
 }
 
@@ -529,10 +543,31 @@ function dind::init {
   dind::set-master-opts
   local master_ip="${dind_ip_base}.2"
   local container_id=$(dind::run kube-master "${master_ip}" 1 127.0.0.1:${APISERVER_PORT}:8080 ${master_opts[@]+"${master_opts[@]}"})
+  local -a init_args
   # FIXME: I tried using custom tokens with 'kubeadm ex token create' but join failed with:
   # 'failed to parse response as JWS object [square/go-jose: compact JWS format must have three parts]'
   # So we just pick the line from 'kubeadm init' output
-  kubeadm_join_flags="$(dind::kubeadm "${container_id}" init --pod-network-cidr="${POD_NETWORK_CIDR}" --skip-preflight-checks "$@" | grep '^ *kubeadm join' | sed 's/^ *kubeadm join //')"
+  if dind::at-least-kubeadm-1-8; then
+    # We must create config file here because unifiedContolPlaneImage can't be set via
+    # a command line flag.
+    # insecure-bind-address and insecure-bind-port are also overridden by patching
+    # apiserver static pod, but someday when k-d-c will only support
+    # kubeadm 1.8+ we'll be able to remove that patching
+    docker exec -i kube-master /bin/sh -c "cat >/etc/kubeadm.conf" <<EOF
+apiVersion: kubeadm.k8s.io/v1alpha1
+kind: MasterConfiguration
+unifiedControlPlaneImage: mirantis/hypokube:final
+networking:
+  podSubnet: "${POD_NETWORK_CIDR}"
+apiServerExtraArgs:
+  insecure-bind-address: "0.0.0.0"
+  insecure-port: "8080"
+EOF
+    init_args=(--config /etc/kubeadm.conf)
+  else
+    init_args=(--pod-network-cidr="${POD_NETWORK_CIDR}")
+  fi
+  kubeadm_join_flags="$(dind::kubeadm "${container_id}" init "${init_args[@]}" --skip-preflight-checks "$@" | grep '^ *kubeadm join' | sed 's/^ *kubeadm join //')"
   dind::configure-kubectl
   dind::deploy-dashboard
 }
@@ -610,7 +645,7 @@ function dind::wait-for-ready {
   local n=3
   while true; do
     dind::kill-failed-pods
-    if "${kubectl}" get nodes 2>/dev/null| grep -q NotReady; then
+    if "${kubectl}" get nodes 2>/dev/null | grep -q NotReady; then
       nodes_ready=
     else
       nodes_ready=y
@@ -633,8 +668,9 @@ function dind::wait-for-ready {
   done
 
   dind::step "Bringing up kube-dns and kubernetes-dashboard"
-  "${kubectl}" scale deployment --replicas=1 -n kube-system kube-dns
-  "${kubectl}" scale deployment --replicas=1 -n kube-system kubernetes-dashboard
+  # on Travis 'scale' sometimes fails with 'error: Scaling the resource failed with: etcdserver: request timed out; Current resource version 442' here
+  dind::retry "${kubectl}" scale deployment --replicas=1 -n kube-system kube-dns
+  dind::retry "${kubectl}" scale deployment --replicas=1 -n kube-system kubernetes-dashboard
 
   while ! dind::component-ready k8s-app=kube-dns || ! dind::component-ready app=kubernetes-dashboard; do
     echo -n "." >&2
@@ -690,33 +726,27 @@ function dind::up {
     bridge)
       ;;
     flannel)
-      if dind::use-rbac; then
-        curl -sSL "https://github.com/coreos/flannel/blob/master/Documentation/kube-flannel-rbac.yml?raw=true" | "${kubectl}" create -f -
-      fi
       # without --validate=false this will fail on older k8s versions
       curl -sSL "https://github.com/coreos/flannel/blob/master/Documentation/kube-flannel.yml?raw=true" | "${kubectl}" create --validate=false -f -
       ;;
     calico)
-      if dind::use-rbac; then
+      if [[ $(dind::k8s-version) = 1.6 ]]; then
         "${kubectl}" apply -f http://docs.projectcalico.org/v2.3/getting-started/kubernetes/installation/hosted/kubeadm/1.6/calico.yaml
       else
-        "${kubectl}" apply -f http://docs.projectcalico.org/v2.3/getting-started/kubernetes/installation/hosted/kubeadm/1.5/calico.yaml
+        "${kubectl}" apply -f https://docs.projectcalico.org/v2.6/getting-started/kubernetes/installation/hosted/kubeadm/1.6/calico.yaml
       fi
       ;;
     calico-kdd)
-      if dind::use-rbac; then
-        "${kubectl}" apply -f http://docs.projectcalico.org/v2.3/getting-started/kubernetes/installation/hosted/kubernetes-datastore/calico-networking/1.6/calico.yaml
+      if [[ $(dind::k8s-version) = 1.6 ]]; then
         "${kubectl}" apply -f http://docs.projectcalico.org/v2.3/getting-started/kubernetes/installation/hosted/rbac.yaml
+        "${kubectl}" apply -f http://docs.projectcalico.org/v2.3/getting-started/kubernetes/installation/hosted/kubernetes-datastore/calico-networking/1.6/calico.yaml
       else
-        "${kubectl}" apply -f http://docs.projectcalico.org/v2.3/getting-started/kubernetes/installation/hosted/kubernetes-datastore/calico-networking/1.5/calico.yaml
+        "${kubectl}" apply -f https://docs.projectcalico.org/v2.6/getting-started/kubernetes/installation/hosted/rbac-kdd.yaml
+        "${kubectl}" apply -f https://docs.projectcalico.org/v2.6/getting-started/kubernetes/installation/hosted/kubernetes-datastore/calico-networking/1.7/calico.yaml
       fi
       ;;
     weave)
-      if dind::use-rbac; then
-        "${kubectl}" apply -f "https://github.com/weaveworks/weave/blob/master/prog/weave-kube/weave-daemonset-k8s-1.6.yaml?raw=true"
-      else
-        "${kubectl}" apply -f https://git.io/weave-kube
-      fi
+      "${kubectl}" apply -f "https://github.com/weaveworks/weave/blob/master/prog/weave-kube/weave-daemonset-k8s-1.6.yaml?raw=true"
       ;;
     *)
       echo "Unsupported CNI plugin '${CNI_PLUGIN}'" >&2
@@ -852,7 +882,7 @@ function dind::do-run-e2e {
          bash -c "cluster/kubectl.sh config set-cluster dind --server='http://localhost:${APISERVER_PORT}' --insecure-skip-tls-verify=true &&
          cluster/kubectl.sh config set-context dind --cluster=dind &&
          cluster/kubectl.sh config use-context dind &&
-         go run hack/e2e.go --v --test --test_args='${test_args}'"
+         go run hack/e2e.go -- --v --test --check-version-skew=false --test_args='${test_args}'"
 }
 
 function dind::clean {
@@ -872,7 +902,11 @@ function dind::run-e2e {
   else
     focus="\[Conformance\]"
   fi
-  dind::do-run-e2e y "${focus}" "${skip}"
+  local parallel=y
+  if [[ ${DIND_NO_PARALLEL_E2E} ]]; then
+    parallel=
+  fi
+  dind::do-run-e2e "${parallel}" "${focus}" "${skip}"
 }
 
 function dind::run-e2e-serial {

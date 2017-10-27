@@ -73,20 +73,27 @@ function snapshot::save {
   # the scripts expects output the output of 'docker diff' as input
   grep -v '^D ' |
     sed 's@^. /@@' |
-    egrep -v '^(tmp|var/lib/kubelet|var/log|etc/mtab|run/)' |
+    egrep -v '^(tmp|var/log|etc/mtab|run/)' |
     while read path; do
-      # FIXME: need to just add all the empty dirs to the list
-      # Non-empty dirs will be added automatically by tar
-      if [[ ! -d ${path} || ${path} =~ ^.*/etcd/.*/snap$ ]]; then
+      # Here we only add dirs if they're empty, as non-empty dirs will
+      # be added automatically by tar
+      if [[ ! -d ${path} || -h ${path} || ! $(ls -A "${path}") ]]; then
         echo "${path}"
       fi
     done |
     tar -C / -cf /dind/snapshot.tar -T -
+  if [[ -f /var/run/kubernetes/kubelet-client.key ]]; then
+    tar -C / -cf /dind/var-run-kubernetes.tar var/run/kubernetes
+  fi
+
   systemctl start kubelet docker
 }
 
 function snapshot::restore {
   tar -C / -xf /dind/snapshot.tar
+  if [[ -f /dind/var-run-kubernetes.tar ]]; then
+    tar -C / -xf /dind/var-run-kubernetes.tar
+  fi
   if [[ ${1:-} = "-u" ]]; then
     wrapkubeadm ensure-binaries
   fi

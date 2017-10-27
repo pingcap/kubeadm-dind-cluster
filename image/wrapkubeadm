@@ -44,8 +44,6 @@ apiserver_insecure_bind_address='.spec.containers[0].command|=map(select(startsw
 # Make apiserver accept insecure connections on port 8080
 # TODO: don't use insecure port
 apiserver_insecure_bind_port='.spec.containers[0].command|=map(select(startswith("--insecure-port=")|not))+["--insecure-port=8080"]'
-# Enable streaming proxy redirects, needed for CRI in k8s 1.5
-apiserver_streaming_proxy_redirects='.spec.containers[0].command|=.+["--feature-gates=StreamingProxyRedirects=true"]'
 # Update kube-proxy CIDR, enable --masquerade-all and disable conntrack (see dind::frob-proxy below)
 function dind::proxy-cidr-and-no-conntrack {
   cluster_cidr="$(ip addr show docker0 | grep -w inet | awk '{ print $2; }')"
@@ -61,6 +59,14 @@ fi
 if [[ -f /dind-sys/sys.tar ]]; then
   tar -C / -xf /dind-sys/sys.tar
 fi
+
+function dind::retry {
+  # based on retry function in hack/jenkins/ scripts in k8s source
+  for i in {1..10}; do
+    "$@" && return 0 || sleep ${i}
+  done
+  "$@"
+}
 
 function dind::get-binary-from-build-data-container {
   local filename="$1"
@@ -198,6 +204,11 @@ function dind::frob-proxy {
   #
   # Recipe by @errordeveloper:
   # https://github.com/kubernetes/kubernetes/pull/34522#issuecomment-253248985
+
+  # sometimes this fails with 'the server doesn't have a resource type "daemonsets"'
+  # if done too early
+  dind::retry kubectl -n kube-system get ds -l k8s-app=kube-proxy -o name >/dev/null
+
   kubectl -n kube-system get ds -l k8s-app=kube-proxy -o json |
     jq "$(dind::join-filters "${proxy_mount_binaries}" "$(dind::proxy-cidr-and-no-conntrack)")" |
     kubectl apply --force -f -
@@ -206,10 +217,6 @@ function dind::frob-proxy {
 
 function dind::frob-apiserver {
   local -a filters=("${mount_binaries}" "${apiserver_insecure_bind_address}" "${apiserver_insecure_bind_port}")
-  # StreamingProxyRedirects is needed for CRI (it's enabled in 1.6+ by default)
-  if kubectl version --short 2>/dev/null|grep -q 'Server.*: v1\.5\.'; then
-    filters+=("${apiserver_streaming_proxy_redirects}")
-  fi
   dind::frob-file "${apiserver_static_pod}" "${filters[@]}"
 }
 
@@ -248,6 +255,17 @@ function dind::frob-cluster {
   dind::frob-proxy
 }
 
+kubelet_extra_args=()
+
+function dind::maybe-use-bootstrap-kubeconfig {
+  # New behavior to be used after https://github.com/kubernetes/kubernetes/pull/49681
+  # Don't use --bootstrap-kubeconfig for k8s 1.7 though
+  if ! /k8s/hyperkube kubelet --help 2>&1 | grep -q -- --bootstrap-kubeconfig || /k8s/hyperkube kubelet --version | grep -q 'v1\.7\.'; then
+    return
+  fi
+  kubelet_extra_args+=(--bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubelet.conf)
+}
+
 function dind::fix-cgroups {
   # Workaround for https://github.com/kubernetes/kubernetes/issues/43704
   if ! egrep -q '^tmpfs\s+/sys/fs/cgroup\s+\S+\s+ro(,|\s|$)' /proc/mounts; then
@@ -256,13 +274,28 @@ function dind::fix-cgroups {
   if ! /k8s/hyperkube kubelet --help 2>&1 | grep -q -- --enforce-node-allocatable; then
     return
   fi
-  mkdir -p /etc/systemd/system/kubelet.service.d
-  cat >/etc/systemd/system/kubelet.service.d/10-fixmac.conf <<EOF
+  kubelet_extra_args+=(--cgroups-per-qos=false --enforce-node-allocatable=)
+}
+
+function dind::maybe-enable-swap {
+  if ! /k8s/hyperkube kubelet --help 2>&1 | grep -q -- --fail-swap-on; then
+    return
+  fi
+  kubelet_extra_args+=("--fail-swap-on=false")
+}
+
+function dind::set-kubelet-extra-args {
+  dind::maybe-use-bootstrap-kubeconfig
+  dind::fix-cgroups
+  dind::maybe-enable-swap
+  if [[ ${#kubelet_extra_args[@]} -gt 0 ]]; then
+    mkdir -p /etc/systemd/system/kubelet.service.d
+    cat >/etc/systemd/system/kubelet.service.d/10-extra-args.conf <<EOF
 [Service]
-Environment="KUBELET_EXTRA_ARGS=--cgroups-per-qos=false --enforce-node-allocatable= --v=4"
+Environment="KUBELET_EXTRA_ARGS=${kubelet_extra_args[@]} --v=4"
 EOF
-  systemctl daemon-reload
-  systemctl restart kubelet
+    systemctl daemon-reload
+  fi
 }
 
 function dind::prepare-for-kubeadm {
@@ -274,12 +307,18 @@ function dind::prepare-for-kubeadm {
   fi
   dind::ensure-binaries-and-hypokube
 
-  dind::fix-cgroups
+  dind::set-kubelet-extra-args
 
   # enable kubelet right before starting kubeadm to avoid
   # longer delays between container restarts
   start_services kubelet
   systemctl enable kubelet
+}
+
+function dind::do-kubeadm {
+  if ! time KUBE_HYPERKUBE_IMAGE="${hypokube_final_image}" kubeadm "$@"; then
+    kubeadm reset || true
+  fi
 }
 
 if [[ ${1:-} = ensure-binaries ]]; then
@@ -290,7 +329,7 @@ else
   systemd-machine-id-setup
   dind::prepare-for-kubeadm
 
-  time KUBE_HYPERKUBE_IMAGE="${hypokube_final_image}" kubeadm "$@"
+  dind::retry dind::do-kubeadm "$@"
 
   if [[ ${is_master} ]]; then
     dind::frob-cluster

@@ -1,6 +1,6 @@
 #!/bin/bash -e
 
-
+KUBE_VERSION="${KUBE_VERSION:-v1.7}"
 REGISTRY=localhost:5000/pingcap
 SOURCE_REGISTRY=uhub.ucloud.cn/pingcap
 INIT_DEPLOYS="registry-proxy.yaml"
@@ -20,7 +20,7 @@ function rebuild::step {
 
 function rebuild::clean_dind {
     rebuild::step "start to cleaning k8s dind cluster"
-    ./fixed/dind-cluster-v1.7.sh clean
+    ./fixed/dind-cluster-${KUBE_VERSION}.sh clean
 }
 
 function rebuild::clean_images {
@@ -30,7 +30,7 @@ function rebuild::clean_images {
 
 function rebuild::up_dind {
     rebuild::step "start to bringing up k8s dind cluster"
-    ./fixed/dind-cluster-v1.7.sh up
+    ./fixed/dind-cluster-${KUBE_VERSION}.sh up
 }
 
 function rebuild::start_registry {

@@ -37,6 +37,9 @@ tempdir="$(mktemp -d)"
 trap "rm -rf '${tempdir}'" EXIT
 export KUBECTL_DIR="${tempdir}"
 
+# FIXME: 192.168.0.0/16 causes problems with Travis(?)
+export POD_NETWORK_CIDR="10.244.0.0/16"
+
 if [[ ${NOBUILD} ]]; then
   bash -x "${DIND_ROOT}"/dind-cluster.sh clean
 else
@@ -79,51 +82,6 @@ function test-cluster-src {
     export BUILD_KUBEADM=y
     export BUILD_HYPERKUBE=y
     test-cluster
-  )
-}
-
-function test-case-1.5 {
-  (
-    export KUBEADM_URL="${KUBEADM_URL_1_5}"
-    export KUBEADM_SHA1="${KUBEADM_SHA1_1_5}"
-    export HYPERKUBE_URL="${HYPERKUBE_URL_1_5}"
-    export HYPERKUBE_SHA1="${HYPERKUBE_SHA1_1_5}"
-    if [[ ${NOBUILD} ]]; then
-      export DIND_IMAGE=mirantis/kubeadm-dind-cluster:v1.5
-      docker pull "${DIND_IMAGE}"
-    else
-      export LOCAL_KUBECTL_VERSION=v1.5
-    fi
-    test-cluster
-  )
-}
-
-function test-case-1.5-flannel {
-  (
-    export CNI_PLUGIN=flannel
-    test-case-1.5
-  )
-}
-
-function test-case-1.5-calico {
-  (
-    export CNI_PLUGIN=calico
-    test-case-1.5
-  )
-}
-
-function test-case-1.5-calico-kdd {
-  (
-    export CNI_PLUGIN=calico-kdd
-    POD_NETWORK_CIDR="192.168.0.0/16"
-    test-case-1.5
-  )
-}
-
-function test-case-1.5-weave {
-  (
-    export CNI_PLUGIN=weave
-    test-case-1.5
   )
 }
 
@@ -217,8 +175,53 @@ function test-case-1.7-weave {
   )
 }
 
-function test-case-src-1.7 {
-  test-cluster-src release-1.7
+function test-case-1.8 {
+  (
+    export KUBEADM_URL="${KUBEADM_URL_1_8}"
+    export KUBEADM_SHA1="${KUBEADM_SHA1_1_8}"
+    export HYPERKUBE_URL="${HYPERKUBE_URL_1_8}"
+    export HYPERKUBE_SHA1="${HYPERKUBE_SHA1_1_8}"
+    if [[ ${NOBUILD} ]]; then
+      export DIND_IMAGE=mirantis/kubeadm-dind-cluster:v1.8
+      docker pull "${DIND_IMAGE}"
+    else
+      export LOCAL_KUBECTL_VERSION=v1.8
+    fi
+    test-cluster
+  )
+}
+
+function test-case-1.8-flannel {
+  (
+    export CNI_PLUGIN=flannel
+    test-case-1.8
+  )
+}
+
+function test-case-1.8-calico {
+  (
+    export CNI_PLUGIN=calico
+    test-case-1.8
+  )
+}
+
+function test-case-1.8-calico-kdd {
+  (
+    export CNI_PLUGIN=calico-kdd
+    POD_NETWORK_CIDR="192.168.0.0/16"
+    test-case-1.8
+  )
+}
+
+function test-case-1.8-weave {
+  (
+    export CNI_PLUGIN=weave
+    test-case-1.8
+  )
+}
+
+function test-case-src-1.8 {
+  test-cluster-src release-1.8
 }
 
 function test-case-src-master {
@@ -255,11 +258,6 @@ function test-case-src-master-weave {
 }
 
 if [[ ! ${TEST_CASE} ]]; then
-  test-case-1.5
-  test-case-1.5-flannel
-  test-case-1.5-calico
-  test-case-1.5-calico-kdd
-  test-case-1.5-weave
   test-case-1.6
   test-case-1.6-flannel
   test-case-1.6-calico
@@ -269,7 +267,12 @@ if [[ ! ${TEST_CASE} ]]; then
   test-case-1.7-calico
   test-case-1.7-calico-kdd
   test-case-1.7-weave
-  test-case-src-1.7
+  test-case-1.8
+  test-case-1.8-flannel
+  test-case-1.8-calico
+  test-case-1.8-calico-kdd
+  test-case-1.8-weave
+  test-case-src-1.8
   test-case-src-master
   # test-case-src-master-flannel
   # test-case-src-master-calico
@@ -281,5 +284,4 @@ fi
 
 echo "*** OK ***"
 
-# TODO: add source build of k8s 1.5 to the matrix
 # TODO: build k8s master daily using Travis cron feature

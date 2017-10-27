@@ -579,7 +579,7 @@ apiServerExtraArgs:
 EOF
     init_args=(--config /etc/kubeadm.conf)
   else
-    init_args=(--pod-network-cidr="${POD_NETWORK_CIDR}")
+    init_args=(--pod-network-cidr="${POD_NETWORK_CIDR}" --kubernetes-version="${KUBERNETES_VERSION}")
   fi
   kubeadm_join_flags="$(dind::kubeadm "${container_id}" init "${init_args[@]}" --skip-preflight-checks "$@" | grep '^ *kubeadm join' | sed 's/^ *kubeadm join //')"
   dind::configure-kubectl

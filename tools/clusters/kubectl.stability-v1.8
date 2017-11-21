@@ -1,0 +1,16 @@
+#!/bin/bash
+
+DIND_NAMESPACE=stability-v1.8
+
+if ! hash kubectl 2>/dev/null
+then
+    echo "You need kubectl binary in your PATH" 1>&2
+    exit 1
+fi
+
+KUBE_CONFIG=$HOME/.kube/config-${DIND_NAMESPACE}
+
+[[ ! -d $(dirname ${KUBE_CONFIG}) ]] && mkdir -p $(dirname ${KUBE_CONFIG})
+
+kubectl=`which kubectl`
+${kubectl} --kubeconfig=${KUBE_CONFIG} $@

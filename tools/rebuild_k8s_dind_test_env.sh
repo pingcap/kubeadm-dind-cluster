@@ -67,14 +67,13 @@ function rebuild::push_images_to_local {
     local -a cluster_array_info
     local LOCAL_REGISTRY_PORT
     local LOCAL_REGISTRY
-    local index=0
     for cluster in ${CLUSTERS[@]}
     do
         cluster_array_info=(`echo ${cluster}|awk -F: '{print $1,$2,$3,$4,$5}'`)
         [[ ${#cluster_array_info[@]} -ne 5 ]] && echo "Wrong cluster info format: ${cluster}, please check it!!!" 1>&2
 
-        [[ $1 != ${cluster_array_info[$index]} ]] && continue
-        LOCAL_REGISTRY_PORT=${cluster_array_info[$index+3]}
+        [[ $1 != ${cluster_array_info[0]} ]] && continue
+        LOCAL_REGISTRY_PORT=${cluster_array_info[3]}
         break
     done
     if [[ ! ${LOCAL_REGISTRY_PORT} ]]
@@ -123,13 +122,12 @@ function rebuild::push_images_to_local {
 function rebuild::get_ns_info {
     local -a ns_array
     local -a cluster_array_info
-    local index=0
     for cluster in ${CLUSTERS[@]}
     do
         cluster_array_info=(`echo ${cluster}|awk -F: '{print $1,$2,$3,$4,$5}'`)
         [[ ${#cluster_array_info[@]} -ne 5 ]] && echo "Wrong cluster info format: ${cluster}, please check it!!!" 1>&2
 
-        ns_array+=(${cluster_array_info[$index]})
+        ns_array+=(${cluster_array_info[0]})
     done
     echo ${ns_array[@]}|tr ' ' '|'
 }
@@ -149,18 +147,17 @@ function rebuild::launch_cluster {
     local cloud_manager_port
     local -a cluster_array_info
 
-    local index=0
     for cluster in ${CLUSTERS[@]}
     do
         cluster_array_info=(`echo ${cluster}|awk -F: '{print $1,$2,$3,$4,$5}'`)
         [[ ${#cluster_array_info[@]} -ne 5 ]] && echo "Wrong cluster info format: ${cluster}, please check it!!!" 1>&2
 
-        namespace=${cluster_array_info[$index]}
+        namespace=${cluster_array_info[0]}
         [[ ${namespace} != ${ns} ]] && continue
-        dind_subnet=${cluster_array_info[$index+1]}
-        apiserver_port=${cluster_array_info[$index+2]}
-        local_registry_port=${cluster_array_info[$index+3]}
-        cloud_manager_port=${cluster_array_info[$index+4]}
+        dind_subnet=${cluster_array_info[1]}
+        apiserver_port=${cluster_array_info[2]}
+        local_registry_port=${cluster_array_info[3]}
+        cloud_manager_port=${cluster_array_info[4]}
         break
     done
     if [[ ! ${dind_subnet} ]]

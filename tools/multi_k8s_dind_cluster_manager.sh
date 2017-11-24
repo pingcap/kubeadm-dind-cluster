@@ -204,6 +204,19 @@ function rebuild::rebuild_cluster {
     rebuild::deploy_apps $1
 }
 
+function rebuild::help {
+    echo "usage:" 1>&2
+    echo "  $0 rebuild namespace" 1>&2
+    echo "  $0 clean namespace" 1>&2
+    echo "  $0 up namespace" 1>&2
+    echo "  $0 down namespace" 1>&2
+    echo "  $0 push namespace" 1>&2
+    echo "The possible namespace values are: $(rebuild::get_all_ns_info)" 1>&2
+    exit 1
+}
+
+[[ $# -ne 2 ]] && rebuild::help
+
 case "${1:-}" in
     rebuild)
         rebuild::rebuild_cluster $2
@@ -221,13 +234,6 @@ case "${1:-}" in
         rebuild::push_images_to_local $2
         ;;
     *)
-        echo "usage:" 1>&2
-        echo "  $0 rebuild namespace" 1>&2
-        echo "  $0 clean namespace" 1>&2
-        echo "  $0 up namespace" 1>&2
-        echo "  $0 down namespace" 1>&2
-        echo "  $0 push namespace" 1>&2
-        echo "The possible namespace values are: $(rebuild::get_all_ns_info)" 1>&2
-        exit 1
+        rebuild::help
     ;;
 esac

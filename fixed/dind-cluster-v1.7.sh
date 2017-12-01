@@ -409,6 +409,7 @@ function dind::run {
     shift
   fi
   local container_name="${1:-}"
+  local full_container_name="${DIND_NAMESPACE}-${container_name}"
   local ip="${2:-}"
   local netshift="${3:-}"
   local portforward="${4:-}"
@@ -426,31 +427,29 @@ function dind::run {
   fi
 
   # remove any previously created containers with the same name
-  docker rm -vf "${container_name}" >&/dev/null || true
+  docker rm -vf "${full_container_name}" >&/dev/null || true
 
   if [[ "$portforward" ]]; then
     opts+=(-p "$portforward")
   fi
 
   ####### expose registry port ########
-  if [[ "${container_name}" = "${DIND_NAMESPACE}-kube-master" ]]; then
+  if [[ "${container_name}" = "kube-master" ]]; then
     opts+=(-p 127.0.0.1:${REGISTRY_PORT}:5001 -p 127.0.0.1:${CLOUD_MANAGER_PORT}:2333 -p 127.0.0.1:${APISERVER_PORT}:8080)
-    hostname="kube-master"
   fi
-  hostname="${hostname:-${container_name}}"
   if [[ ${CNI_PLUGIN} = bridge && ${netshift} ]]; then
     args+=("systemd.setenv=CNI_BRIDGE_NETWORK_OFFSET=0.0.${netshift}.0")
   fi
 
   opts+=(${sys_volume_args[@]+"${sys_volume_args[@]}"})
 
-  dind::step "Starting DIND container:" "${container_name}"
+  dind::step "Starting DIND container:" "${DIND_NAMESPACE}-${container_name}"
 
   if [[ ! ${is_moby_linux} ]]; then
     opts+=(-v /boot:/boot -v /lib/modules:/lib/modules)
   fi
 
-  volume_name="kubeadm-dind-${container_name}"
+  volume_name="kubeadm-dind-${full_container_name}"
   dind::ensure-network
   dind::ensure-volume ${reuse_volume} "${volume_name}"
 
@@ -464,8 +463,8 @@ function dind::run {
          -d --privileged \
          -e KUBE_REPO_PREFIX="${KUBE_REPO_PREFIX}" \
          --net ${DIND_NAMESPACE}.kubeadm-dind-net \
-         --name "${container_name}" \
-         --hostname "${hostname}" \
+         --name "${full_container_name}" \
+         --hostname "${container_name}" \
          -l ${DIND_NAMESPACE}.kubeadm_dind_cluster \
          -v ${volume_name}:/dind \
          ${opts[@]+"${opts[@]}"} \
@@ -562,7 +561,7 @@ function dind::init {
   local -a opts
   dind::set-master-opts
   local master_ip="${dind_ip_base}.2"
-  local container_id=$(dind::run ${DIND_NAMESPACE}-kube-master "${master_ip}" 1  ${master_opts[@]+"${master_opts[@]}"})
+  local container_id=$(dind::run kube-master "${master_ip}" 1  ${master_opts[@]+"${master_opts[@]}"})
   local -a init_args
   # FIXME: I tried using custom tokens with 'kubeadm ex token create' but join failed with:
   # 'failed to parse response as JWS object [square/go-jose: compact JWS format must have three parts]'
@@ -615,7 +614,7 @@ function dind::create-node-container {
       opts+=(-e HYPERKUBE_SOURCE=build://)
     fi
   fi
-  dind::run ${reuse_volume} ${DIND_NAMESPACE}-kube-node-${next_node_index} ${node_ip} $((next_node_index + 1)) "" ${opts[@]+"${opts[@]}"}
+  dind::run ${reuse_volume} kube-node-${next_node_index} ${node_ip} $((next_node_index + 1)) "" ${opts[@]+"${opts[@]}"}
 }
 
 function dind::join {
@@ -815,7 +814,7 @@ function dind::restore {
     (
       if [[ n -eq 0 ]]; then
         dind::step "Restoring master container"
-        dind::restore_container "$(dind::run -r ${DIND_NAMESPACE}-kube-master "${master_ip}" 1 127.0.0.1:${APISERVER_PORT}:8080 ${master_opts[@]+"${master_opts[@]}"})"
+        dind::restore_container "$(dind::run -r kube-master "${master_ip}" 1 127.0.0.1:${APISERVER_PORT}:8080 ${master_opts[@]+"${master_opts[@]}"})"
         dind::step "Master container restored"
       else
         dind::step "Restoring node container:" ${n}

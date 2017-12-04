@@ -3,8 +3,8 @@
 SOURCE_REGISTRY=uhub.ucloud.cn/pingcap
 INIT_DEPLOYS="registry-proxy.yaml"
 TIDB_IMAGES="tidb tikv pd"
-TIDB_BASE_TAG="v1.0.0"
-IMAGES="tidb-tools:latest tidb-dashboard-installer:v1.0.0 grafana:4.2.0 prometheus:v1.5.2 pushgateway:v0.3.1"
+TIDB_BASE_TAG="v1.0.3"
+IMAGES="tidb-tools:latest tidb-dashboard-installer:v1.0.0 grafana:4.2.0 prometheus:v2.0.0 pushgateway:v0.3.1"
 
 # format -> namespace:dind_subnet:apiserver_port:local_registry_port:cloud_manager_port
 CLUSTERS=(

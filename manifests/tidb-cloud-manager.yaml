@@ -18,7 +18,7 @@ rules:
   resources: ["nodes"]
   verbs: ["get", "list"]
 - apiGroups: [""]
-  resources: ["configmaps", "services", "pods"]
+  resources: ["configmaps", "services", "pods", "serviceaccounts", "persistentvolumes"]
   verbs: ["*"]
 - apiGroups: [""]
   resources: ["namespaces"]
@@ -41,6 +41,9 @@ rules:
 - apiGroups: [""]
   resources: ["endpoints"]
   verbs: ["create", "get", "update"]
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["roles", "rolebindings"]
+  verbs: ["get", "create", "list", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRoleBinding
@@ -104,6 +107,8 @@ spec:
           - -L=debug
           - -repo-prefix=uhub.ucloud.cn/pingcap
           - -retention-duration=0
+          - -backup-dir=/data
+          - -expose-privileged-tidb-svc=true
           # - -alertmanagerURL=http://alertmanager.kube-system:9093
         env:
           - name: MY_POD_NAMESPACE

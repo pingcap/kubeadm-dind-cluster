@@ -4,21 +4,53 @@
     "tidb_lease": 1,
     "pd": {
         "size": 1,
-        "version": "latest"
+        "containers": [
+            {
+                "name": "pd",
+                "version": "v1.0.3"
+            }
+        ]
     },
     "tidb": {
         "size": 1,
-        "version": "latest"
+        "containers": [
+            {
+                "name": "tidb",
+                "version": "v1.0.3"
+            },
+            {
+                "name": "binlog",
+                "version": "latest"
+            }
+        ]
     },
     "tikv": {
         "size": 3,
-        "version": "latest"
+        "containers": [
+            {
+                "name": "tikv",
+                "version": "v1.0.3"
+            }
+        ]
     },
     "monitor": {
         "size": 1,
-        "version": "4.2.0,v1.5.2,v0.3.1,v1.0.0"
+        "containers": [
+            {
+                "name": "grafana",
+                "version": "4.2.0"
+            },
+            {
+                "name": "prometheus",
+                "version": "v2.0.0"
+            },
+            {
+                "name": "tidb-dashboard-installer",
+                "version": "v1.0.0"
+            }
+        ]
     },
-    "config": "latest-config-template",
+    "config": "v1.0.3-config-template",
     "monitor_reserve_days": 35,
     "root_password": "pingcap123456"
 }

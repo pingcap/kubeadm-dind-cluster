@@ -21,11 +21,11 @@ data:
     data-dir = "data.pump"
 
     # kafka where pump push binlog to
-    {{ if eq .KafkaAddr ""}}
+    <%- if eq .KafkaAddr "" %>
     # kafka-addrs = "kafka-0.kafka-svc.default.svc.cluster.local:9092"
-    {{ else }}
-    kafka-addrs = "{{.KafkaAddr}}"
-    {{ end }}
+    <%- else %>
+    kafka-addrs = "<% .KafkaAddr %>"
+    <%- end %>
 
     # zookeeper addrs, get kafka-addrs from zookeeper if uncomment this
     # zookeeper-addrs = "zk-0.zk-svc.default.svc.cluster.local:2181"
@@ -134,7 +134,7 @@ data:
     run-ddl = true
 
     # Schema lease duration, very dangerous to change only if you know what you do.
-    lease = "{{.TiDBLease}}s"
+    lease = "<% .TiDBLease %>s"
 
     # When create table, split a separated region for it.
     # split-table = false
@@ -174,7 +174,7 @@ data:
 
     [security]
     # This option causes the server to start without using the privilege system at all.
-    skip-grant-table = {{.SkipGrantTable}}
+    skip-grant-table = <% .SkipGrantTable %>
 
     # Path of file that contains list of trusted SSL CAs.
     ssl-ca = ""
@@ -268,11 +268,11 @@ data:
     # grpc-stream-initial-window-size = "2MB"
 
     # size of thread pool for endpoint task, should less than total cpu cores.
-    {{ if eq .EndpointConcurrency 0 }}
+    <%- if eq .EndpointConcurrency 0 %>
     # end-point-concurrency = 8
-    {{ else }}
-    end-point-concurrency = {{.EndpointConcurrency}}
-    {{ end }}
+    <%- else %>
+    end-point-concurrency = <% .EndpointConcurrency %>
+    <%- end %>
 
     # max count of tasks being handled, new tasks will be rejected.
     # end-point-max-tasks = 2000
@@ -309,7 +309,7 @@ data:
     # the Prometheus client push interval. Setting the value to 0s stops Prometheus client from pushing.
     # interval = "15s"
     # the Prometheus pushgateway address. Leaving it empty stops Prometheus client from pushing.
-    address = "{{.MetricsAddr}}"
+    address = "<% .MetricsAddr %>"
     # the Prometheus client push job name. Note: A node id will automatically append, e.g., "tikv_1".
     # job = "tikv"
 
@@ -537,11 +537,11 @@ data:
 
     # block-cache used to cache uncompressed blocks, big block-cache can speed up read.
     # in normal cases should tune to 30%-50% system's total memory.
-    {{ if eq .DefaultCFBlockCacheSize ""}}
+    <%- if eq .DefaultCFBlockCacheSize "" %>
     # block-cache-size = "1GB"
-    {{ else }}
-    block-cache-size = "{{.DefaultCFBlockCacheSize}}"
-    {{ end }}
+    <%- else %>
+    block-cache-size = "<% .DefaultCFBlockCacheSize %>"
+    <%- end %>
 
     # Indicating if we'd put index/filter blocks to the block cache.
     # If not specified, each "table reader" object will pre-load index/filter block
@@ -572,11 +572,11 @@ data:
     # target-file-size-base = "8MB"
 
     # in normal cases should tune to 10%-30% system's total memory.
-    {{ if eq .WriteCFBlockCacheSize "" }}
+    <%- if eq .WriteCFBlockCacheSize "" %>
     # block-cache-size = "256MB"
-    {{ else }}
-    block-cache-size = "{{.WriteCFBlockCacheSize}}"
-    {{ end }}
+    <%- else %>
+    block-cache-size = "<% .WriteCFBlockCacheSize %>"
+    <%- end %>
     # level0-file-num-compaction-trigger = 4
     # level0-slowdown-writes-trigger = 20
     # level0-stop-writes-trigger = 36
@@ -641,14 +641,14 @@ data:
     global:
       scrape_interval: 15s
       evaluation_interval: 15s
-    {{ if eq .AlertmanagerURL "" }}
-    {{ else }}
+    <%- if eq .AlertmanagerURL "" %>
+    <%- else %>
     alerting:
       alertmanagers:
       - static_configs:
         - targets:
-          - {{.AlertmanagerURL}}
-    {{ end }}
+          - <% .AlertmanagerURL %>
+    <%- end %>
     scrape_configs:
       - job_name: 'tidb-cluster'
         scrape_interval: 15s
@@ -657,7 +657,7 @@ data:
         - role: pod
           namespaces:
             names:
-            - {{.Namespace}}
+            - <% .Namespace %>
         tls_config:
           insecure_skip_verify: true
         relabel_configs:
@@ -687,37 +687,37 @@ data:
         expr: rate(tidb_domain_load_schema_total{type="failed"}[1m]) > 0
         for: 1s
         labels:
-          env: '{{.ClusterName}}'
+          env: '<% .ClusterName %>'
         annotations:
           description: 'alert: rate(tidb_domain_load_schema_total{type=''failed''} instance:
-            {{.MetaInstance}} values: {{.MetaValue}}'
+            <% .MetaInstance %> values: <% .MetaValue %>'
           summary: TiDB load schema fails
       - alert: local_shema_latency
         expr: histogram_quantile(1, rate(tidb_domain_load_schema_duration_bucket[5m])) > 5
         for: 1m
         labels:
-          env: '{{.ClusterName}}'
+          env: '<% .ClusterName %>'
         annotations:
           description: 'alert: histogram_quantile(1, rate(tidb_domain_load_schema_duration_bucket
-            [5m])) instance: {{.MetaInstance}}  values: {{.MetaValue}}'
+            [5m])) instance: <% .MetaInstance %>  values: <% .MetaValue %>'
           summary: TiDB load schema latency is over 5s
       - alert: memery_abnormal
         expr: go_memstats_heap_inuse_bytes{job="tidb"} > 1e+09
         for: 10m
         labels:
-          env: '{{.ClusterName}}'
+          env: '<% .ClusterName %>'
         annotations:
-          description: 'alert: go_memstats_heap_inuse_bytes{job=''tidb''} instance: {{.MetaInstance}}  values:
-            {{.MetaValue}}'
+          description: 'alert: go_memstats_heap_inuse_bytes{job=''tidb''} instance: <% .MetaInstance %>  values:
+            <% .MetaValue %>'
           summary: TiDB mem heap is over 1GiB
       - alert: tidb_query_duration
         expr: histogram_quantile(0.99, sum(rate(tidb_server_handle_query_duration_seconds_bucket[1m]))
           BY (le, instance)) > 1
         for: 5s
         labels:
-          env: '{{.ClusterName}}'
+          env: '<% .ClusterName %>'
         annotations:
-          description: 'instance: {{.MetaInstance}} values: {{.MetaValue}} alert: histogram_quantile(0.99,
+          description: 'instance: <% .MetaInstance %> values: <% .MetaValue %> alert: histogram_quantile(0.99,
             sum(rate(tidb_server_handle_query_duration_seconds_bucket[1m])) by (le, instance))
             > 1 .'
           summary: TiDB query duration 99th percentile is above 1s
@@ -726,10 +726,10 @@ data:
         for: 1m
         labels:
           channels: alerts
-          env: '{{.ClusterName}}'
+          env: '<% .ClusterName %>'
         annotations:
           description: 'alert: sum(rate(tidb_tikvclient_region_err_total{type=''server_is_busy''}[1m]))
-            instance: {{.MetaInstance}} values: {{.MetaValue}}'
+            instance: <% .MetaInstance %> values: <% .MetaValue %>'
           summary: TiDB server is busy
       - alert: tikv_raft_process_ready
         expr: sum(rate(tikv_raftstore_raft_process_nanos_total{type="ready"}[1m])) BY
@@ -737,93 +737,93 @@ data:
         for: 1m
         labels:
           channels: alerts
-          env: '{{.ClusterName}}'
+          env: '<% .ClusterName %>'
         annotations:
           description: 'alert: sum(rate(tikv_raftstore_raft_process_nanos_total{type=''ready''[1m]))
-            by (type, instance) / 1000000000 instance: {{.MetaInstance}} values: {{.MetaValue}}'
+            by (type, instance) / 1000000000 instance: <% .MetaInstance %> values: <% .MetaValue %>'
           summary: TiKV raft process ready duration is above 1s
       - alert: raft_sotre_msg
         expr: sum(rate(tikv_server_report_failure_msg_total{type="unreachable"}[1m])) > 10
         for: 1m
         labels:
           channels: alerts
-          env: '{{.ClusterName}}'
+          env: '<% .ClusterName %>'
         annotations:
           description: 'alert: sum(rate(tikv_server_raft_store_msg_total{type=''unreachable''}[1m]))
-            > 10  values:{{.MetaValue}}'
+            > 10  values:<% .MetaValue %>'
           summary: TiKV too many unreachable raft stores
       - alert: tikv_channel_full_total
         expr: sum(rate(tikv_channel_full_total[1m])) BY (type, instance) > 0
         for: 1s
         labels:
           channels: alerts
-          env: '{{.ClusterName}}'
+          env: '<% .ClusterName %>'
         annotations:
           description: 'alert: sum(rate(tikv_channel_full_total[1m])) by (type, instance)  instance:
-            {{.MetaInstance}}  values: {{.MetaValue}}'
+            <% .MetaInstance %>  values: <% .MetaValue %>'
           summary: TiKV channel full
       - alert: coprocessor_pending_request
         expr: sum(rate(tikv_coprocessor_pending_request[1m])) BY (type, instance) > 2
         for: 10s
         labels:
-          env: '{{.ClusterName}}'
+          env: '<% .ClusterName %>'
         annotations:
           description: 'alert: sum(rate(tikv_coprocessor_pending_request[1m])) by (type,instance)
-            > 2 type: {{.MetaType}} instance: {{.MetaInstance}}  values: {{.MetaValue}}'
+            > 2 type: {{.MetaType}} instance: <% .MetaInstance %>  values: <% .MetaValue %>'
           summary: TiKV pending {{.MetaType}} request is high
       - alert: tikv_scheduler_context_total
         expr: sum(tikv_scheduler_contex_total) BY (job) > 300
         for: 2m
         labels:
-          env: '{{.ClusterName}}'
+          env: '<% .ClusterName %>'
         annotations:
           description: 'alert: sum(tikv_scheduler_contex_total) by (job) > 300 instance:
-            {{.MetaInstance}}  values: {{.MetaValue}}'
+            <% .MetaInstance %>  values: <% .MetaValue %>'
           summary: TiKV scheduler context total
       - alert: tikv_thread_cpu_seconds_total
         expr: rate(tikv_thread_cpu_seconds_total{name="raftstore"}[1m]) > 0.8
         for: 1m
         labels:
-          env: '{{.ClusterName}}'
+          env: '<% .ClusterName %>'
         annotations:
           description: 'alert: rate(tikv_thread_cpu_seconds_total{name=''raftstore''}[1m])
-            > 0.8 instance {{.MetaInstance}} values: {{.MetaValue}}'
+            > 0.8 instance <% .MetaInstance %> values: <% .MetaValue %>'
           summary: TiKV raftstore thread CPU seconds is high
       - alert: tikv_thread_cpu_seconds_total
         expr: rate(tikv_thread_cpu_seconds_total{name="endpoint-pool"}[1m]) > 0.9
         for: 1m
         labels:
-          env: '{{.ClusterName}}'
+          env: '<% .ClusterName %>'
         annotations:
           description: 'alert: rate(tikv_thread_cpu_seconds_total{name=''endpoint-pool''}[1m])
-            > 0.9 instance {{.MetaInstance}} values: {{.MetaValue}}'
+            > 0.9 instance <% .MetaInstance %> values: <% .MetaValue %>'
           summary: TiKV endpoint-pool thread CPU seconds is high
       - alert: tikv_thread_cpu_seconds_total
         expr: rate(tikv_thread_cpu_seconds_total{name="sched-worker-pool"}[1m]) > 0.9
         for: 1m
         labels:
-          env: '{{.ClusterName}}'
+          env: '<% .ClusterName %>'
         annotations:
           description: 'alert: rate(tikv_thread_cpu_seconds_total{name=''sched-worker-pool''}[1m])
-            > 0.9 instance {{.MetaInstance}} values: {{.MetaValue}}'
+            > 0.9 instance <% .MetaInstance %> values: <% .MetaValue %>'
           summary: TiKV sched-worker-pool thread CPU seconds is high
       - alert: tikv_leader_drops
         expr: delta(tikv_pd_heartbeat_tick_total{type="leader"}[30s]) < -10
         for: 1s
         labels:
           channels: alerts
-          env: '{{.ClusterName}}'
+          env: '<% .ClusterName %>'
         annotations:
           description: 'alert: delta(tikv_pd_heartbeat_tick_total{type=''leader''}[30s])
-            > 10 instance: {{.MetaInstance}}   values:{{.MetaValue}}'
+            > 10 instance: <% .MetaInstance %>   values:<% .MetaValue %>'
           summary: TiKV leader drops
       - alert: etcd_disk_fsync
         expr: sum(rate(etcd_disk_wal_fsync_duration_seconds_count[1m])) BY (instance) == 0
         for: 1m
         labels:
           channels: alerts
-          env: '{{.ClusterName}}'
+          env: '<% .ClusterName %>'
         annotations:
           description: 'alert: sum(rate(etcd_disk_wal_fsync_duration_seconds_count[1m]))
-            by (instance) instance: {{.MetaInstance}}   values:{{.MetaValue}}'
+            by (instance) instance: <% .MetaInstance %>   values:<% .MetaValue %>'
           summary: PD etcd disk fsync is down

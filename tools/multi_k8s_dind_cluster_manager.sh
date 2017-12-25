@@ -193,6 +193,7 @@ function rebuild::up_cluster {
     fi
     rebuild::step "start to up k8s dind cluster with namespace ${namespace}"
     rebuild::up_dind ${namespace} ${dind_subnet} ${apiserver_port} ${local_registry_port} ${cloud_manager_port}
+    rebuild::deploy_apps ${namespace}
 }
 
 function rebuild::rebuild_cluster {

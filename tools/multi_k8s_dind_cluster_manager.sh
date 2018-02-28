@@ -3,8 +3,8 @@
 SOURCE_REGISTRY=uhub.ucloud.cn/pingcap
 INIT_DEPLOYS="registry-proxy.yaml"
 TIDB_IMAGES="tidb tikv pd"
-TIDB_BASE_TAG="v1.0.3"
-IMAGES="tidb-tools:latest tidb-dashboard-installer:v1.0.0 grafana:4.2.0 prometheus:v2.0.0 pushgateway:v0.3.1"
+TIDB_BASE_TAG="v1.0.8"
+IMAGES="tidb-tools:latest tidb-dashboard-installer:v1.0.7 grafana:4.2.0 prometheus:v2.0.0 pushgateway:v0.3.1"
 
 # format -> namespace:dind_subnet:apiserver_port:local_registry_port:cloud_manager_port
 CLUSTERS=(
@@ -135,7 +135,7 @@ function rebuild::down_cluster {
     export DIND_NAMESPACE=$1
     local kube_version
     kube_version=`echo ${DIND_NAMESPACE}|awk -F- '{print $NF}'`
-    ./fixed/dind-cluster-${kube_version}.sh down
+    docker ps -a -q --filter=label=${DIND_NAMESPACE}.kubeadm_dind_cluster|xargs -I {} -n1 docker stop {}
 }
 
 function rebuild::clean_cluster {
@@ -150,13 +150,7 @@ function rebuild::clean_cluster {
 function rebuild::up_dind {
     rebuild::step "start to bringing up k8s dind cluster with namespace $1"
     export DIND_NAMESPACE=$1
-    export DIND_SUBNET=$2
-    export APISERVER_PORT=$3
-    export REGISTRY_PORT=$4
-    export CLOUD_MANAGER_PORT=$5
-    local kube_version
-    kube_version=`echo ${DIND_NAMESPACE}|awk -F- '{print $NF}'`
-    ./fixed/dind-cluster-${kube_version}.sh up
+    docker ps -a -q --filter=label=${DIND_NAMESPACE}.kubeadm_dind_cluster|xargs -I {} -n1 docker start {}
 }
 
 function rebuild::up_cluster {
@@ -171,6 +165,7 @@ function rebuild::up_cluster {
     local apiserver_port
     local local_registry_port
     local cloud_manager_port
+    local kube_version
     local -a cluster_array_info
 
     for cluster in ${CLUSTERS[@]}
@@ -192,8 +187,8 @@ function rebuild::up_cluster {
         exit 1
     fi
     rebuild::step "start to up k8s dind cluster with namespace ${namespace}"
-    rebuild::up_dind ${namespace} ${dind_subnet} ${apiserver_port} ${local_registry_port} ${cloud_manager_port}
-    rebuild::deploy_apps ${namespace}
+    kube_version=`echo ${namespace}|awk -F- '{print $NF}'`
+    ./fixed/dind-cluster-${kube_version}.sh up
 }
 
 function rebuild::rebuild_cluster {
@@ -226,7 +221,7 @@ case "${1:-}" in
         rebuild::clean_cluster $2
         ;;
     up)
-        rebuild::up_cluster $2
+        rebuild::up_dind $2
         ;;
     down)
         rebuild::down_cluster $2

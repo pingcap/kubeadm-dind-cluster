@@ -3,24 +3,20 @@
     "service_type": "NodePort",
     "tidb_lease": 1,
     "pd": {
-        "size": 1,
+        "size": 3,
         "containers": [
             {
                 "name": "pd",
-                "version": "v1.0.3"
+                "version": "v1.0.8"
             }
         ]
     },
     "tidb": {
-        "size": 1,
+        "size": 2,
         "containers": [
             {
                 "name": "tidb",
-                "version": "v1.0.3"
-            },
-            {
-                "name": "binlog",
-                "version": "latest"
+                "version": "v1.0.8"
             }
         ]
     },
@@ -29,7 +25,11 @@
         "containers": [
             {
                 "name": "tikv",
-                "version": "v1.0.3"
+                "version": "v1.0.8"
+            },
+            {
+                "name": "pushgateway",
+                "image": "uhub.ucloud.cn/pingcap/pushgateway:v0.3.1"
             }
         ]
     },
@@ -46,7 +46,7 @@
             },
             {
                 "name": "tidb-dashboard-installer",
-                "version": "v1.0.0"
+                "version": "v1.0.7"
             }
         ]
     },

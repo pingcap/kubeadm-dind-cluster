@@ -161,7 +161,7 @@ spec:
       serviceAccount: tidb-controller-manager
       containers:
       - name: tidb-operator
-        image: uhub.ucloud.cn/pingcap/tidb-operator:latest
+        image: uhub.ucloud.cn/pingcap/tidb-operator:v1.1.0
         resources:
           limits:
             cpu: 250m
@@ -254,7 +254,7 @@ spec:
       serviceAccount: tidb-scheduler
       containers:
       - name: tidb-scheduler
-        image: uhub.ucloud.cn/pingcap/tidb-operator:latest
+        image: uhub.ucloud.cn/pingcap/tidb-operator:v1.1.0
         resources:
           limits:
             cpu: 250m
@@ -322,7 +322,7 @@ spec:
       serviceAccount: tidb-volume-manager
       containers:
       - name: tidb-volume-manager
-        image: uhub.ucloud.cn/pingcap/tidb-operator:latest
+        image: uhub.ucloud.cn/pingcap/tidb-operator:v1.1.0
         resources:
           limits:
             cpu: 250m

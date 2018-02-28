@@ -548,11 +548,11 @@ function dind::deploy-dashboard {
   "${kubectl}" create clusterrolebinding add-on-cluster-admin --clusterrole=cluster-admin --serviceaccount=kube-system:default
 }
 
-function dind::at-least-kubeadm-1-8 {
+function dind::at-least-kubeadm-1-7 {
   # kubeadm 1.6 and below doesn't support 'version -o short' and will
   # thus produce an empty string
   local ver="$(docker exec ${DIND_NAMESPACE}-kube-master kubeadm version -o short 2>/dev/null|sed 's/[^0-9]*\.[0-9]*$//')"
-  if [[ ! ${ver} || ${ver} = v1.7 ]]; then
+  if [[ ! ${ver} ]]; then
     return 1
   fi
 }
@@ -566,7 +566,7 @@ function dind::init {
   # FIXME: I tried using custom tokens with 'kubeadm ex token create' but join failed with:
   # 'failed to parse response as JWS object [square/go-jose: compact JWS format must have three parts]'
   # So we just pick the line from 'kubeadm init' output
-  if dind::at-least-kubeadm-1-8; then
+  if dind::at-least-kubeadm-1-7; then
     # We must create config file here because unifiedContolPlaneImage can't be set via
     # a command line flag.
     # insecure-bind-address and insecure-bind-port are also overridden by patching
@@ -583,6 +583,8 @@ networking:
 apiServerExtraArgs:
   insecure-bind-address: "0.0.0.0"
   insecure-port: "8080"
+controllerManagerExtraArgs:
+  feature-gates: TaintBasedEvictions=true
 EOF
     init_args=(--config /etc/kubeadm.conf)
   else

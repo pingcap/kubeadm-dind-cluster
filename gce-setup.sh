@@ -29,8 +29,17 @@ fi
 
 set -x
 KUBE_DIND_VM="${KUBE_DIND_VM:-k8s-dind}"
+export GCE_HOSTED=true
 export KUBE_RSYNC_PORT=8730
 export APISERVER_PORT=8899
+IP_MODE="${IP_MODE:-ipv4}"
+opts=("-L ${KUBE_RSYNC_PORT}:localhost:${KUBE_RSYNC_PORT}")
+
+if [[ "${IP_MODE}" = "ipv4" ]]; then
+    opts+=("-L ${APISERVER_PORT}:localhost:${APISERVER_PORT}")
+else
+    opts+=("-L ${APISERVER_PORT}:[::1]:${APISERVER_PORT}")
+fi
 docker-machine create \
                --driver=google \
                --google-project=${KUBE_DIND_GCE_PROJECT} \
@@ -42,9 +51,12 @@ docker-machine create \
                --engine-storage-driver=overlay2 \
                ${KUBE_DIND_VM}
 eval $(docker-machine env ${KUBE_DIND_VM})
-docker-machine ssh ${KUBE_DIND_VM} \
-               -L ${KUBE_RSYNC_PORT}:localhost:${KUBE_RSYNC_PORT} \
-               -L ${APISERVER_PORT}:localhost:${APISERVER_PORT} \
-               -N&
+docker-machine ssh ${KUBE_DIND_VM} ${opts[*]} -N&
+if [ ! -z "${DIND_IMAGE:-}" ]; then
+    place=`pwd`
+    cd "${DIND_ROOT}"
+    build/build-local.sh
+    cd "$place"
+fi
 time "${DIND_ROOT}"/dind-cluster.sh up
 set +x

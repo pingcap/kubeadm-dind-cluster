@@ -12,6 +12,8 @@ e2e-v1.7:10.192.0.0:8080:5000:32333
 stability-v1.7:10.193.0.0:8081:5001:32334
 e2e-v1.8:10.194.0.0:8082:5002:32335
 stability-v1.8:10.195.0.0:8083:5003:32336
+e2e-v1.9:10.196.0.0:8084:5004:32337
+stability-v1.9:10.197.0.0:8085:5005:32338
 )
 
 ### change workspace
@@ -71,14 +73,15 @@ function rebuild::deploy_apps {
 
     dind_subnet=$(rebuild::get_info_by_ns $1 1)
     master_ip=$(echo ${dind_subnet}|cut -d. -f1-3).2
+    export KUBECONFIG=$HOME/.kube/config-$1
     for deploy in ${INIT_DEPLOYS}
     do
         if [[ ${deploy} == "registry-proxy.yaml" ]]
         then
-            sed "s/10.192.0.2/${master_ip}/g" ./manifests/${deploy}|./tools/clusters/kubectl.$1 apply -f -
+            sed "s/10.192.0.2/${master_ip}/g" ./manifests/${deploy}|kubectl apply -f -
             continue
         fi
-        ./tools/clusters/kubectl.$1 apply -f ${deploy}
+        kubectl apply -f ${deploy}
     done
 }
 
@@ -132,10 +135,9 @@ function rebuild::get_all_ns_info {
 
 function rebuild::down_cluster {
     rebuild::step "start to down k8s dind cluster with namespace $1"
-    export DIND_NAMESPACE=$1
     local kube_version
-    kube_version=`echo ${DIND_NAMESPACE}|awk -F- '{print $NF}'`
-    docker ps -a -q --filter=label=${DIND_NAMESPACE}.kubeadm_dind_cluster|xargs -I {} -n1 docker stop {}
+    kube_version=`echo $1|awk -F- '{print $NF}'`
+    docker ps -a -q --filter=label=$1.kubeadm_dind_cluster|xargs -I {} -n1 docker stop {}
 }
 
 function rebuild::clean_cluster {
@@ -149,8 +151,7 @@ function rebuild::clean_cluster {
 # the input args: $namespace $dind_subnet $apiserver_port $local_registry_port $cloud_manager_port
 function rebuild::up_dind {
     rebuild::step "start to bringing up k8s dind cluster with namespace $1"
-    export DIND_NAMESPACE=$1
-    docker ps -a -q --filter=label=${DIND_NAMESPACE}.kubeadm_dind_cluster|xargs -I {} -n1 docker start {}
+    docker ps -a -q --filter=label=$1.kubeadm_dind_cluster|xargs -I {} -n1 docker start {}
 }
 
 function rebuild::up_cluster {
@@ -187,6 +188,11 @@ function rebuild::up_cluster {
         exit 1
     fi
     rebuild::step "start to up k8s dind cluster with namespace ${namespace}"
+    export DIND_NAMESPACE=${namespace}
+    export DIND_SUBNET=${dind_subnet}
+    export APISERVER_PORT=${apiserver_port}
+    export REGISTRY_PORT=${local_registry_port}
+    export CLOUD_MANAGER_PORT=${cloud_manager_port}
     kube_version=`echo ${namespace}|awk -F- '{print $NF}'`
     ./fixed/dind-cluster-${kube_version}.sh up
 }
@@ -222,6 +228,7 @@ case "${1:-}" in
         ;;
     up)
         rebuild::up_dind $2
+        rebuild::deploy_apps $2
         ;;
     down)
         rebuild::down_cluster $2

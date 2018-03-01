@@ -1,5 +1,10 @@
-# DIND subnet (/16 is always used)
-DIND_SUBNET=10.192.0.0
+if [[ ${IP_MODE} = "ipv4" ]]; then
+    # DinD subnet (expected to be /16)
+    DIND_SUBNET="${DIND_SUBNET:-10.192.0.0}"
+else
+    # DinD subnet (expected to be /64)
+    DIND_SUBNET="${DIND_SUBNET:-fd00:10::}"
+fi
 
 # Apiserver port
 APISERVER_PORT=${APISERVER_PORT:-8080}
@@ -13,7 +18,7 @@ NUM_NODES=${NUM_NODES:-2}
 # KUBEADM_DIND_LOCAL=
 
 # Use prebuilt DIND image
-DIND_IMAGE="${DIND_IMAGE:-mirantis/kubeadm-dind-cluster:v1.6}"
+DIND_IMAGE="${DIND_IMAGE:-mirantis/kubeadm-dind-cluster:v1.8}"
 
 # Set to non-empty string to enable building kubeadm
 # BUILD_KUBEADM=y
@@ -47,3 +52,7 @@ CNI_PLUGIN="${CNI_PLUGIN:-bridge}"
 # Disable parallel running of e2e tests. Use this if you use a resource
 # constrained machine for e2e tests and get some flakes.
 # DIND_NO_PARALLEL_E2E=y
+
+# Any options to be passed to the docker run both on init and reup.
+# By default it's empty
+# MASTER_EXTRA_OPTS="  "

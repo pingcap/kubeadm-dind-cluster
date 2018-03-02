@@ -228,7 +228,6 @@ case "${1:-}" in
         ;;
     up)
         rebuild::up_dind $2
-        rebuild::deploy_apps $2
         ;;
     down)
         rebuild::down_cluster $2

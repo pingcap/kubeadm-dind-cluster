@@ -69,6 +69,9 @@ spec:
           # If not specified, Dashboard will attempt to auto discover the API server and connect
           # to it. Uncomment only if the default does not work.
           # - --apiserver-host=http://my-address:port
+        volumeMounts:
+            - mountPath: /tmp
+              name: tmp-volume
         livenessProbe:
           httpGet:
             path: /
@@ -80,6 +83,9 @@ spec:
       tolerations:
       - key: node-role.kubernetes.io/master
         effect: NoSchedule
+      volumes:
+        - name: tmp-volume
+          emptyDir: {}
 ---
 kind: Service
 apiVersion: v1

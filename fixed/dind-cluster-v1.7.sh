@@ -769,6 +769,7 @@ nodeName: kube-master
 apiServerExtraArgs:
   insecure-bind-address: "${bind_address}"
   insecure-port: "8080"
+  runtime-config: batch/v2alpha1=true
 controllerManagerExtraArgs:
   feature-gates: TaintBasedEvictions=true
 EOF

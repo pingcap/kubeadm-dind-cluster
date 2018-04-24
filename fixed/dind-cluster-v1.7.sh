@@ -155,7 +155,6 @@ else
     echo "You need kubectl binary in your PATH to use prebuilt DIND image" 1>&2
     exit 1
   fi
-  export KUBECONFIG=$HOME/.kube/config-${DIND_NAMESPACE}
   kubectl=`which kubectl`
 fi
 

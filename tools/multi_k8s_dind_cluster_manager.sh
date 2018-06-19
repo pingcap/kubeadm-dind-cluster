@@ -28,7 +28,7 @@ function rebuild::step {
 
 function rebuild::clean_images {
     rebuild::step "start to remove useless images"
-    docker images|docker images|grep -v kubeadm-dind-cluster|egrep "tidb-operator|<none>|tidb-cloud-manager"|awk '{print $3}'|xargs -I{} -n1 docker rmi -f {} || true
+    docker images|grep -v kubeadm-dind-cluster|egrep "tidb-operator|<none>|tidb-cloud-manager"|awk '{print $3}'|xargs -I{} -n1 docker rmi -f {} || true
 }
 
 function rebuild::start_registry {

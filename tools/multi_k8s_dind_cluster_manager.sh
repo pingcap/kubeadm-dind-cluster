@@ -14,6 +14,8 @@ e2e-v1.8:10.194.0.0:8082:5002:32335
 stability-v1.8:10.195.0.0:8083:5003:32336
 e2e-v1.9:10.196.0.0:8084:5004:32337
 stability-v1.9:10.197.0.0:8085:5005:32338
+e2e-v1.10:10.198.0.0:8085:50056:32339
+stability-v1.10:10.199.0.0:8086:5007:32340
 )
 
 ### change workspace
@@ -73,7 +75,6 @@ function rebuild::deploy_apps {
 
     dind_subnet=$(rebuild::get_info_by_ns $1 1)
     master_ip=$(echo ${dind_subnet}|cut -d. -f1-3).2
-    export KUBECONFIG=$HOME/.kube/config-$1
     for deploy in ${INIT_DEPLOYS}
     do
         if [[ ${deploy} == "registry-proxy.yaml" ]]

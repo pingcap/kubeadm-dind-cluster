@@ -18,7 +18,7 @@ NUM_NODES=${NUM_NODES:-2}
 # KUBEADM_DIND_LOCAL=
 
 # Use prebuilt DIND image
-DIND_IMAGE="${DIND_IMAGE:-mirantis/kubeadm-dind-cluster:v1.8}"
+DIND_IMAGE="${DIND_IMAGE:-mirantis/kubeadm-dind-cluster:v1.10}"
 
 # Set to non-empty string to enable building kubeadm
 # BUILD_KUBEADM=y
@@ -29,7 +29,7 @@ DIND_IMAGE="${DIND_IMAGE:-mirantis/kubeadm-dind-cluster:v1.8}"
 # download kubectl on the host
 # Set automatically based on DIND image version tag
 # if image version tag is of the form vNNN.NNN
-# LOCAL_KUBECTL_VERSION="${LOCAL_KUBECTL_VERSION:-v1.7}"
+# LOCAL_KUBECTL_VERSION="${LOCAL_KUBECTL_VERSION:-v1.10}"
 
 # Set custom URL for Dashboard yaml file
 # DASHBOARD_URL="${DASHBOARD_URL:-https://rawgit.com/kubernetes/dashboard/bfab10151f012d1acc5dfb1979f3172e2400aa3c/src/deploy/kubernetes-dashboard.yaml}"
@@ -56,3 +56,29 @@ CNI_PLUGIN="${CNI_PLUGIN:-bridge}"
 # Any options to be passed to the docker run both on init and reup.
 # By default it's empty
 # MASTER_EXTRA_OPTS="  "
+
+# Define which DNS service to run
+# possible values are kube-dns (default) and coredns
+DNS_SERVICE="${DNS_SERVICE:-kube-dns}"
+
+# Feature Gates
+# This value will be passed to kube-apiserver, kube-controller-manager and kube-scheduler
+# you can set special value 'none' not to set any feature gates on them.
+# FEATURE_GATES=""
+
+# Kubelet Feature Gates
+# you can set special value 'none' not to set any feature gates on kubelet.
+# KUBELET_FEATURE_GATES=""
+
+# You can configure extra component args for kube-apiservers
+# APISERVER_underscored_option_name will be converted --hyphenated-option-name
+# e.g. APISERVER_admission_control=xxx,yyy -> --admission-control=xxx,yyy
+# APISERVER_xxx_yyy=zzz
+
+# Extra component args for kube-controller-manager
+# CONTROLLER_MANAGER_underscored_option_name will be converted --hyphenated-option-name
+# CONTROLLER_MANAGER_xxx=yyy
+
+# Extra component args for kube-scheduler
+# SCHEDULER_underscored_option_name will be converted --hyphenated-option-name
+# SCHEDULER_xxx=yyy

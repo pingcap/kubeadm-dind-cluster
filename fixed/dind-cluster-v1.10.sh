@@ -12,17 +12,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 set -o errexit
 set -o nounset
 set -o pipefail
 set -o errtrace
+
+KUBE_VERSION="v1.10"
 
 if [ $(uname) = Darwin ]; then
   readlinkf(){ perl -MCwd -e 'print Cwd::abs_path shift' "$1";}
 else
   readlinkf(){ readlink -f "$1"; }
 fi
-DIND_ROOT="$(cd $(dirname "$(readlinkf "${BASH_SOURCE}")"); pwd)"
+DIND_ROOT="$(cd $(dirname "$(readlinkf "${BASH_SOURCE}")")/..; pwd)"
 
 RUN_ON_BTRFS_ANYWAY="${RUN_ON_BTRFS_ANYWAY:-}"
 if [[ ! ${RUN_ON_BTRFS_ANYWAY} ]] && docker info| grep -q '^Storage Driver: btrfs'; then
@@ -50,7 +53,7 @@ if [[ $(uname) == Linux && -z ${DOCKER_HOST:-} ]]; then
     using_linuxdocker=1
 fi
 
-#%CONFIG%
+EMBEDDED_CONFIG=y;DIND_IMAGE=uhub.ucloud.cn/pingcap/kubeadm-dind-cluster:${KUBE_VERSION}
 
 IP_MODE="${IP_MODE:-ipv4}"  # ipv4, ipv6, (future) dualstack
 if [[ ! ${EMBEDDED_CONFIG:-} ]]; then
@@ -58,6 +61,7 @@ if [[ ! ${EMBEDDED_CONFIG:-} ]]; then
 fi
 
 CNI_PLUGIN="${CNI_PLUGIN:-bridge}"
+DIND_NAMESPACE="${DIND_NAMESPACE:-default}"
 ETCD_HOST="${ETCD_HOST:-127.0.0.1}"
 GCE_HOSTED="${GCE_HOSTED:-}"
 DIND_ALLOW_AAAA_USE="${DIND_ALLOW_AAAA_USE:-}"  # Default is to use DNS64 always for IPv6 mode
@@ -146,12 +150,15 @@ BUILD_KUBEADM="${BUILD_KUBEADM:-}"
 BUILD_HYPERKUBE="${BUILD_HYPERKUBE:-}"
 KUBEADM_SOURCE="${KUBEADM_SOURCE-}"
 HYPERKUBE_SOURCE="${HYPERKUBE_SOURCE-}"
-APISERVER_PORT=${APISERVER_PORT:-8080}
-NUM_NODES=${NUM_NODES:-2}
+APISERVER_PORT="${APISERVER_PORT:-8080}"
+REGISTRY_PORT="${REGISTRY_PORT:-5000}"
+CLOUD_MANAGER_PORT="${CLOUD_MANAGER_PORT:-32333}"
+
+NUM_NODES="${NUM_NODES:-9}"
 EXTRA_PORTS="${EXTRA_PORTS:-}"
 LOCAL_KUBECTL_VERSION=${LOCAL_KUBECTL_VERSION:-}
 KUBECTL_DIR="${KUBECTL_DIR:-${HOME}/.kubeadm-dind-cluster}"
-DASHBOARD_URL="${DASHBOARD_URL:-https://rawgit.com/kubernetes/dashboard/bfab10151f012d1acc5dfb1979f3172e2400aa3c/src/deploy/kubernetes-dashboard.yaml}"
+DASHBOARD_URL="${DASHBOARD_URL:-${DIND_ROOT}/manifests/kubernetes-dashboard.yaml}"
 SKIP_SNAPSHOT="${SKIP_SNAPSHOT:-}"
 E2E_REPORT_DIR="${E2E_REPORT_DIR:-}"
 DIND_NO_PARALLEL_E2E="${DIND_NO_PARALLEL_E2E:-}"
@@ -162,12 +169,13 @@ DIND_PROPAGATE_HTTP_PROXY="${DIND_PROPAGATE_HTTP_PROXY:-}"
 DIND_HTTP_PROXY="${DIND_HTTP_PROXY:-}"
 DIND_HTTPS_PROXY="${DIND_HTTPS_PROXY:-}"
 DIND_NO_PROXY="${DIND_NO_PROXY:-}"
-
+KUBE_REPO_PREFIX="${KUBE_REPO_PREFIX:-uhub.service.ucloud.cn/pingcap}"
+POD_INFRA_CONTAINER_IMAGE="${POD_INFRA_CONTAINER_IMAGE:-${KUBE_REPO_PREFIX}/pause-amd64:3.1}"
 DIND_DAEMON_JSON_FILE="${DIND_DAEMON_JSON_FILE:-/etc/docker/daemon.json}"  # can be set to /dev/null
 DIND_REGISTRY_MIRROR="${DIND_REGISTRY_MIRROR:-}"  # plain string format
 DIND_INSECURE_REGISTRIES="${DIND_INSECURE_REGISTRIES:-}"  # json list format
 
-FEATURE_GATES="${FEATURE_GATES:-MountPropagation=true}"
+FEATURE_GATES="${FEATURE_GATES:-MountPropagation=true,TaintBasedEvictions=true}"
 # you can set special value 'none' not to set any kubelet's feature gates.
 KUBELET_FEATURE_GATES="${KUBELET_FEATURE_GATES:-MountPropagation=true,DynamicKubeletConfig=true}"
 
@@ -198,7 +206,7 @@ else
     echo "You need kubectl binary in your PATH to use prebuilt DIND image" 1>&2
     exit 1
   fi
-  kubectl=kubectl
+  kubectl=`which kubectl`
 fi
 
 function dind::retry {
@@ -240,7 +248,7 @@ function dind::volume-exists {
 
 function dind::create-volume {
   local name="$1"
-  docker volume create --label mirantis.kubeadm_dind_cluster --name "${name}" >/dev/null
+  docker volume create --label ${DIND_NAMESPACE}.kubeadm_dind_cluster --name "${name}" >/dev/null
 }
 
 # We mount /boot and /lib/modules into the container
@@ -396,6 +404,11 @@ function dind::ensure-downloaded-kubectl {
   local full_kubectl_version
 
   case "${LOCAL_KUBECTL_VERSION}" in
+    v1.7)
+      full_kubectl_version=v1.7.12
+      kubectl_sha1_linux=385229d4189e4f7978de42f237d6c443c0534edd
+      kubectl_sha1_darwin=af0e0853b965aa42774bba5dfbaeecb416fc6089
+      ;;
     v1.8)
       full_kubectl_version=v1.8.11
       kubectl_sha1_linux=6a089bec1802611ad9f5120c486a6e0e00095279
@@ -438,7 +451,7 @@ function dind::ensure-downloaded-kubectl {
   if [[ ! -f "${path}" ]]; then
     mkdir -p "${KUBECTL_DIR}"
     curl -sSLo "${path}" "https://storage.googleapis.com/kubernetes-release/release/${full_kubectl_version}/bin/${kubectl_os}/amd64/kubectl"
-    echo "${kubectl_sha1}  ${path}" | sha1sum -c
+    echo "${kubectl_sha1} ${path}" | sha1sum -c
     chmod +x "${path}"
   fi
 
@@ -476,13 +489,13 @@ function dind::ensure-binaries {
 }
 
 function dind::ensure-network {
-  if ! docker network inspect kubeadm-dind-net >&/dev/null; then
+  if ! docker network inspect ${DIND_NAMESPACE}.kubeadm-dind-net >&/dev/null; then
     local v6settings=""
     if [[ ${IP_MODE} = "ipv6" ]]; then
       # Need second network for NAT64
       v6settings="--subnet=172.18.0.0/16 --ipv6"
     fi
-    docker network create ${v6settings} --subnet="${DIND_SUBNET}/${DIND_SUBNET_SIZE}" --gateway="${dind_ip_base}1" kubeadm-dind-net >/dev/null
+    docker network create ${v6settings} --subnet="${DIND_SUBNET}/${DIND_SUBNET_SIZE}" --gateway="${dind_ip_base}1" ${DIND_NAMESPACE}.kubeadm-dind-net >/dev/null
   fi
 }
 
@@ -540,7 +553,7 @@ BIND9_EOF
 		docker-machine ssh k8s-dind sudo mkdir -p ${bind9_path}/conf ${bind9_path}/cache
 		docker-machine ssh k8s-dind sudo cp /home/docker-user/bind9-named.conf ${bind9_path}/conf/named.conf
 	    fi
-	    docker run -d --name bind9 --hostname bind9 --net kubeadm-dind-net --label mirantis.kubeadm_dind_cluster \
+	    docker run -d --name bind9 --hostname bind9 --net ${DIND_NAMESPACE}.kubeadm-dind-net --label ${DIND_NAMESPACE}.kubeadm_dind_cluster \
 		   --sysctl net.ipv6.conf.all.disable_ipv6=0 --sysctl net.ipv6.conf.all.forwarding=1 \
 		   --privileged=true --ip6 ${dns_server} --dns ${dns_server} \
 		   -v ${bind9_path}/conf/named.conf:/etc/bind/named.conf \
@@ -555,16 +568,16 @@ BIND9_EOF
 function dind::ensure-nat {
     if [[  ${IP_MODE} = "ipv6" ]]; then
         if ! docker ps | grep tayga >&/dev/null; then
-            docker run -d --name tayga --hostname tayga --net kubeadm-dind-net --label mirantis.kubeadm_dind_cluster \
-		   --sysctl net.ipv6.conf.all.disable_ipv6=0 --sysctl net.ipv6.conf.all.forwarding=1 \
-		   --privileged=true --ip 172.18.0.200 --ip6 ${LOCAL_NAT64_SERVER} --dns ${REMOTE_DNS64_V4SERVER} --dns ${dns_server} \
-		   -e TAYGA_CONF_PREFIX=${DNS64_PREFIX_CIDR} -e TAYGA_CONF_IPV4_ADDR=172.18.0.200 \
-		   danehans/tayga:latest >/dev/null
-	    # Need to check/create, as "clean" may remove route
-	    local route="$(ip route | egrep "^172.18.0.128/25")"
-	    if [[ -z "${route}" ]]; then
-		if [[ ${GCE_HOSTED} ]]; then
-		    docker-machine ssh k8s-dind sudo ip route add 172.18.0.128/25 via 172.18.0.200
+            docker run -d --name tayga --hostname tayga --net ${DIND_NAMESPACE}.kubeadm-dind-net --label ${DIND_NAMESPACE}.kubeadm_dind_cluster \
+           --sysctl net.ipv6.conf.all.disable_ipv6=0 --sysctl net.ipv6.conf.all.forwarding=1 \
+           --privileged=true --ip 172.18.0.200 --ip6 ${LOCAL_NAT64_SERVER} --dns ${REMOTE_DNS64_V4SERVER} --dns ${dns_server} \
+           -e TAYGA_CONF_PREFIX=${DNS64_PREFIX_CIDR} -e TAYGA_CONF_IPV4_ADDR=172.18.0.200 \
+           danehans/tayga:latest >/dev/null
+        # Need to check/create, as "clean" may remove route
+        local route="$(ip route | egrep "^172.18.0.128/25")"
+        if [[ -z "${route}" ]]; then
+        if [[ "${GCE_HOSTED}" = true ]]; then
+            docker-machine ssh k8s-dind sudo ip route add 172.18.0.128/25 via 172.18.0.200
     elif [[ -z ${using_linuxdocker} ]]; then
         :
 		else
@@ -582,6 +595,7 @@ function dind::run {
     shift
   fi
   local container_name="${1:-}"
+  local full_container_name="${DIND_NAMESPACE}-${container_name}"
   local ip="${2:-}"
   local node_id="${3:-}"
   local portforward="${4:-}"
@@ -629,7 +643,7 @@ function dind::run {
   fi
 
   # remove any previously created containers with the same name
-  docker rm -vf "${container_name}" >&/dev/null || true
+  docker rm -vf "${full_container_name}" >&/dev/null || true
 
   if [[ "${portforward}" ]]; then
     IFS=';' read -ra array <<< "${portforward}"
@@ -638,15 +652,24 @@ function dind::run {
     done
   fi
 
+  ####### expose registry port ########
+  if [[ "${container_name}" = "kube-master" ]]; then
+    opts+=(-p 127.0.0.1:${REGISTRY_PORT}:5001 -p 127.0.0.1:${CLOUD_MANAGER_PORT}:2333)
+  fi
+
+  if [[ ${CNI_PLUGIN} = bridge && ${node_id} ]]; then
+    args+=("systemd.setenv=CNI_BRIDGE_NETWORK_OFFSET=0.0.${node_id}.0")
+  fi
+
   opts+=(${sys_volume_args[@]+"${sys_volume_args[@]}"})
 
-  dind::step "Starting DIND container:" "${container_name}"
+  dind::step "Starting DIND container:" "${full_container_name}"
 
   if [[ ! ${using_linuxkit} ]]; then
     opts+=(-v /boot:/boot -v /lib/modules:/lib/modules)
   fi
 
-  volume_name="kubeadm-dind-${container_name}"
+  volume_name="kubeadm-dind-${full_container_name}"
   dind::ensure-network
   dind::ensure-volume ${reuse_volume} "${volume_name}"
   dind::ensure-nat
@@ -661,10 +684,11 @@ function dind::run {
          -e KUBEADM_SOURCE="${KUBEADM_SOURCE}" \
          -e HYPERKUBE_SOURCE="${HYPERKUBE_SOURCE}" \
          -d --privileged \
-         --net kubeadm-dind-net \
-         --name "${container_name}" \
+         -e KUBE_REPO_PREFIX="${KUBE_REPO_PREFIX}" \
+         --net ${DIND_NAMESPACE}.kubeadm-dind-net \
+         --name "${full_container_name}" \
          --hostname "${container_name}" \
-         -l mirantis.kubeadm_dind_cluster \
+         -l ${DIND_NAMESPACE}.kubeadm_dind_cluster \
          -v ${volume_name}:/dind \
          ${opts[@]+"${opts[@]}"} \
          "${DIND_IMAGE}" \
@@ -676,10 +700,14 @@ function dind::kubeadm {
   shift
   dind::step "Running kubeadm:" "$*"
   status=0
+  # add other user's write permission
+  pts=`readlink /dev/fd/2`
+  sudo chmod o+w $pts
   # See image/bare/wrapkubeadm.
   # Capturing output is necessary to grab flags for 'kubeadm join'
   kubelet_feature_gates="-e KUBELET_FEATURE_GATES=${KUBELET_FEATURE_GATES}"
-  if ! docker exec ${kubelet_feature_gates} "${container_id}" /usr/local/bin/wrapkubeadm "$@" 2>&1 | tee /dev/fd/2; then
+  pod_infra_container_image="-e POD_INFRA_CONTAINER_IMAGE=${POD_INFRA_CONTAINER_IMAGE}"
+  if ! docker exec ${pod_infra_container_image} ${kubelet_feature_gates} "${container_id}" /usr/local/bin/wrapkubeadm "$@" 2>&1 | tee /dev/fd/2; then
     echo "*** kubeadm failed" >&2
     return 1
   fi
@@ -698,7 +726,7 @@ function dind::kubeadm {
 # }
 
 function dind::configure-kubectl {
-  dind::step "Setting cluster config"
+  dind::step "Setting cluster config ${DIND_NAMESPACE}-dind"
   local host="${dind_ip_base}2"
   if [[ ${IP_MODE} = "ipv6" ]]; then
       host="[${host}]"
@@ -710,9 +738,9 @@ function dind::configure-kubectl {
       host="[::1]"
     fi
   fi
-  "${kubectl}" config set-cluster dind --server="http://${host}:${APISERVER_PORT}" --insecure-skip-tls-verify=true
-  "${kubectl}" config set-context dind --cluster=dind
-  "${kubectl}" config use-context dind
+  "${kubectl}" config set-cluster ${DIND_NAMESPACE}-dind --server="http://${host}:${APISERVER_PORT}" --insecure-skip-tls-verify=true
+  "${kubectl}" config set-context ${DIND_NAMESPACE}-dind --cluster=${DIND_NAMESPACE}-dind
+  "${kubectl}" config use-context ${DIND_NAMESPACE}-dind
 }
 
 force_make_binaries=
@@ -752,7 +780,7 @@ function dind::ensure-dashboard-clusterrolebinding {
                --clusterrole=cluster-admin \
                --serviceaccount=kube-system:default \
                -o json --dry-run |
-    docker exec -i kube-master jq '.apiVersion="rbac.authorization.k8s.io/v1beta1"|.kind|="ClusterRoleBinding"' |
+    docker exec -i ${DIND_NAMESPACE}-kube-master jq '.apiVersion="rbac.authorization.k8s.io/v1beta1"|.kind|="ClusterRoleBinding"' |
     "${kubectl}" apply -f -
 }
 
@@ -770,7 +798,7 @@ function dind::kubeadm-version {
       grep Client |
       sed 's/^.*: v\([0-9.]*\).*/\1/'
   else
-    docker exec kube-master \
+    docker exec ${DIND_NAMESPACE}-kube-master \
            /bin/bash -c 'kubeadm version -o json | jq -r .clientVersion.gitVersion' |
       sed 's/^v\([0-9.]*\).*/\1/'
   fi
@@ -799,63 +827,35 @@ function dind::init {
   if [[ ${IP_MODE} = "ipv6" ]]; then
     bind_address="::"
   fi
-  dind::proxy kube-master
-  dind::custom-docker-opts kube-master
-
+  dind::proxy ${DIND_NAMESPACE}-kube-master
+  dind::custom-docker-opts ${DIND_NAMESPACE}-kube-master
   # HACK: Indicating mode, so that wrapkubeadm will not set a cluster CIDR for kube-proxy
   # in IPv6 (only) mode.
   if [[ ${IP_MODE} = "ipv6" ]]; then
-    docker exec --privileged -i kube-master touch /v6-mode
+    docker exec --privileged -i ${DIND_NAMESPACE}-kube-master touch /v6-mode
   fi
-
-  feature_gates="{}"
-  if [[ ${DNS_SERVICE} == "coredns" ]]; then
-    # can't just use 'CoreDNS: false' because
-    # it'll break k8s 1.8. FIXME: simplify
-    # after 1.8 support is removed
-    feature_gates="{CoreDNS: true}"
-  elif docker exec kube-master kubeadm init --help 2>&1 | grep -q CoreDNS; then
-    # FIXME: CoreDNS should be the default in 1.11
-    feature_gates="{CoreDNS: false}"
-  fi
-
-  component_feature_gates=""
-  if [ "${FEATURE_GATES}" != "none" ]; then
-    component_feature_gates="feature-gates: \\\"${FEATURE_GATES}\\\""
-  fi
-
-  apiserver_extra_args=""
-  for e in $(set -o posix ; set | grep -E "^APISERVER_[a-z_]+=" | cut -d'=' -f 1); do
-    opt_name=$(echo ${e#APISERVER_} | sed 's/_/-/g')
-    apiserver_extra_args+="  ${opt_name}: \\\"$(eval echo \$$e)\\\"\\n"
-  done
-
-  controller_manager_extra_args=""
-  for e in $(set -o posix ; set | grep -E "^CONTROLLER_MANAGER_[a-z_]+=" | cut -d'=' -f 1); do
-    opt_name=$(echo ${e#CONTROLLER_MANAGER_} | sed 's/_/-/g')
-    controller_manager_extra_args+="  ${opt_name}: \\\"$(eval echo \$$e)\\\"\\n"
-  done
-
-  scheduler_extra_args=""
-  for e in $(set -o posix ; set | grep -E "^SCHEDULER_[a-z_]+=" | cut -d'=' -f 1); do
-    opt_name=$(echo ${e#SCHEDULER_} | sed 's/_/-/g')
-    scheduler_extra_args+="  ${opt_name}: \\\"$(eval echo \$$e)\\\"\\n"
-  done
 
   kubeadm_version="$(dind::kubeadm-version)"
-  docker exec -i kube-master bash <<EOF
-sed -e "s|{{ADV_ADDR}}|${kube_master_ip}|" \
-    -e "s|{{POD_SUBNET_DISABLE}}|${pod_subnet_disable}|" \
-    -e "s|{{POD_NETWORK_CIDR}}|${POD_NETWORK_CIDR}|" \
-    -e "s|{{SVC_SUBNET}}|${SERVICE_CIDR}|" \
-    -e "s|{{BIND_ADDR}}|${bind_address}|" \
-    -e "s|{{FEATURE_GATES}}|${feature_gates}|" \
-    -e "s|{{KUBEADM_VERSION}}|${kubeadm_version}|" \
-    -e "s|{{COMPONENT_FEATURE_GATES}}|${component_feature_gates}|" \
-    -e "s|{{APISERVER_EXTRA_ARGS}}|${apiserver_extra_args}|" \
-    -e "s|{{CONTROLLER_MANAGER_EXTRA_ARGS}}|${controller_manager_extra_args}|" \
-    -e "s|{{SCHEDULER_EXTRA_ARGS}}|${scheduler_extra_args}|" \
-    /etc/kubeadm.conf.tmpl > /etc/kubeadm.conf
+  docker exec --privileged -i ${DIND_NAMESPACE}-kube-master /bin/sh -c "cat >/etc/kubeadm.conf" <<EOF
+apiVersion: kubeadm.k8s.io/v1alpha1
+unifiedControlPlaneImage: mirantis/hypokube:final
+kind: MasterConfiguration
+kubernetesVersion: "${kubeadm_version}"
+imageRepository: "${KUBE_REPO_PREFIX}"
+api:
+  advertiseAddress: "${kube_master_ip}"
+networking:
+  ${pod_subnet_disable}podSubnet: "${POD_NETWORK_CIDR}"
+  serviceSubnet: "${SERVICE_CIDR}"
+nodeName: kube-master
+schedulerExtraArgs:
+  feature-gates: ${FEATURE_GATES}
+apiServerExtraArgs:
+  insecure-bind-address: "${bind_address}"
+  insecure-port: "8080"
+  feature-gates: ${FEATURE_GATES}
+controllerManagerExtraArgs:
+  feature-gates: ${FEATURE_GATES}
 EOF
   # TODO: --skip-preflight-checks needs to be replaced with
   # --ignore-preflight-errors=all for k8s 1.10+
@@ -863,7 +863,7 @@ EOF
   init_args=(--config /etc/kubeadm.conf)
   # required when building from source
   if [[ ${BUILD_KUBEADM} || ${BUILD_HYPERKUBE} ]]; then
-    docker exec kube-master mount --make-shared /k8s
+    docker exec ${DIND_NAMESPACE}-kube-master mount --make-shared /k8s
   fi
   kubeadm_join_flags="$(dind::kubeadm "${container_id}" init "${init_args[@]}" --skip-preflight-checks "$@" | grep '^ *kubeadm join' | sed 's/^ *kubeadm join //')"
   dind::configure-kubectl
@@ -878,7 +878,7 @@ function dind::create-node-container {
   # if there's just one node currently, it's master, thus we need to use
   # kube-node-1 hostname, if there are two nodes, we should pick
   # kube-node-2 and so on
-  local next_node_index=${1:-$(docker ps -q --filter=label=mirantis.kubeadm_dind_cluster | wc -l | sed 's/^ *//g')}
+  local next_node_index=${1:-$(docker ps -q --filter=label=${DIND_NAMESPACE}.kubeadm_dind_cluster | wc -l | sed 's/^ *//g')}
   local node_ip="${dind_ip_base}$((next_node_index + 2))"
   local -a opts
   if [[ ${BUILD_KUBEADM} || ${BUILD_HYPERKUBE} ]]; then
@@ -910,7 +910,7 @@ function dind::accelerate-kube-dns {
      dind::step "Patching kube-dns deployment to make it start faster"
      # Could do this on the host, too, but we don't want to require jq here
      # TODO: do this in wrapkubeadm
-     docker exec kube-master /bin/bash -c \
+     docker exec ${DIND_NAMESPACE}-kube-master /bin/bash -c \
         "kubectl get deployment kube-dns -n kube-system -o json | jq '.spec.template.spec.containers[0].readinessProbe.initialDelaySeconds = 3|.spec.template.spec.containers[0].readinessProbe.periodSeconds = 3' | kubectl apply --force -f -"
  fi
 }
@@ -943,18 +943,18 @@ function dind::create-static-routes-for-bridge {
   echo "Creating static routes for bridge plugin"
   for ((i=0; i <= NUM_NODES; i++)); do
     if [[ ${i} -eq 0 ]]; then
-      node="kube-master"
+      node="${DIND_NAMESPACE}-kube-master"
     else
-      node="kube-node-${i}"
+      node="${DIND_NAMESPACE}-kube-node-${i}"
     fi
     for ((j=0; j <= NUM_NODES; j++)); do
       if [[ ${i} -eq ${j} ]]; then
 	continue
       fi
       if [[ ${j} -eq 0 ]]; then
-        dest_node="kube-master"
+        dest_node="${DIND_NAMESPACE}-kube-master"
       else
-        dest_node="kube-node-${j}"
+        dest_node="${DIND_NAMESPACE}-kube-node-${j}"
       fi
       id=$((${j}+1))
       if [[ ${IP_MODE} = "ipv4" ]]; then
@@ -1058,7 +1058,7 @@ function dind::wait-for-ready {
   dind::retry "${kubectl}" scale deployment --replicas=1 -n kube-system kubernetes-dashboard
 
   ntries=200
-  while ! dind::component-ready k8s-app=kube-dns || ! dind::component-ready app=kubernetes-dashboard; do
+  while ! dind::component-ready k8s-app=kube-dns || ! dind::component-ready k8s-app=kubernetes-dashboard; do
     if ((--ntries == 0)); then
       echo "Error bringing up ${DNS_SERVICE} and kubernetes-dashboard" >&2
       exit 1
@@ -1115,7 +1115,7 @@ function dind::up {
   else
     # FIXME: this may fail depending on k8s/kubeadm version
     # FIXME: check for taint & retry if it's there
-    "${kubectl}" taint nodes kube-master node-role.kubernetes.io/master- || true
+    "${kubectl}" taint nodes ${DIND_NAMESPACE}-kube-master node-role.kubernetes.io/master- || true
   fi
   case "${CNI_PLUGIN}" in
     bridge)
@@ -1153,10 +1153,11 @@ function dind::up {
 
 function dind::fix-mounts {
   for ((n=0; n <= NUM_NODES; n++)); do
-    local node_name=kube-master
+    local node_name=${DIND_NAMESPACE}-kube-master
     if ((n > 0)); then
-      node_name="kube-node-${n}"
+      node_name="${DIND_NAMESPACE}-kube-node-${n}"
     fi
+    # docker exec "${node_name}" mount --make-shared /lib/modules/
     docker exec "${node_name}" mount --make-shared /run
     if [[ ! ${using_linuxkit} ]]; then
       docker exec "${node_name}" mount --make-shared /lib/modules/
@@ -1178,9 +1179,9 @@ function dind::snapshot_container {
 
 function dind::snapshot {
   dind::step "Taking snapshot of the cluster"
-  dind::snapshot_container kube-master
+  dind::snapshot_container ${DIND_NAMESPACE}-kube-master
   for ((n=1; n <= NUM_NODES; n++)); do
-    dind::snapshot_container "kube-node-${n}"
+    dind::snapshot_container "${DIND_NAMESPACE}-kube-node-${n}"
   done
   dind::wait-for-ready
 }
@@ -1233,7 +1234,7 @@ function dind::restore {
 }
 
 function dind::down {
-  docker ps -a -q --filter=label=mirantis.kubeadm_dind_cluster | while read container_id; do
+  docker ps -a -q --filter=label=${DIND_NAMESPACE}.kubeadm_dind_cluster | while read container_id; do
     dind::step "Removing container:" "${container_id}"
     docker rm -fv "${container_id}"
   done
@@ -1243,19 +1244,19 @@ function dind::down {
 }
 
 function dind::remove-volumes {
-  # docker 1.13+: docker volume ls -q -f label=mirantis.kubeadm_dind_cluster
-  docker volume ls -q | (grep '^kubeadm-dind' || true) | while read volume_id; do
+  # docker 1.13+: docker volume ls -q -f label=${DIND_NAMESPACE}.kubeadm_dind_cluster
+  docker volume ls -q | (grep "kubeadm-dind-${DIND_NAMESPACE}" || true) | while read volume_id; do
     dind::step "Removing volume:" "${volume_id}"
     docker volume rm "${volume_id}"
   done
 }
 
 function dind::check-for-snapshot {
-  if ! dind::volume-exists "kubeadm-dind-kube-master"; then
+  if ! dind::volume-exists "${DIND_NAMESPACE}.kubeadm-dind-kube-master"; then
     return 1
   fi
   for ((n=1; n <= NUM_NODES; n++)); do
-    if ! dind::volume-exists "kubeadm-dind-kube-node-${n}"; then
+    if ! dind::volume-exists "${DIND_NAMESPACE}.kubeadm-dind-kube-node-${n}"; then
       return 1
     fi
   done
@@ -1319,8 +1320,8 @@ function dind::clean {
   dind::down
   # dind::remove-images
   dind::remove-volumes
-  if docker network inspect kubeadm-dind-net >&/dev/null; then
-    docker network rm kubeadm-dind-net
+  if docker network inspect ${DIND_NAMESPACE}.kubeadm-dind-net >&/dev/null; then
+    docker network rm ${DIND_NAMESPACE}.kubeadm-dind-net
   fi
 }
 
@@ -1385,7 +1386,7 @@ function dind::step {
 function dind::dump {
   set +e
   echo "*** Dumping cluster state ***"
-  for node in $(docker ps --format '{{.Names}}' --filter label=mirantis.kubeadm_dind_cluster); do
+  for node in $(docker ps --format '{{.Names}}' --filter label=${DIND_NAMESPACE}.kubeadm_dind_cluster); do
     for service in kubelet.service dindnet.service criproxy.service dockershim.service; do
       if docker exec "${node}" systemctl is-enabled "${service}" >&/dev/null; then
         echo "@@@ service-${node}-${service}.log @@@"
@@ -1402,23 +1403,23 @@ function dind::dump {
     echo "@@@ ip-r-${node}.txt @@@"
     docker exec "${node}" ip r
   done
-  docker exec kube-master kubectl get pods --all-namespaces \
+  docker exec ${DIND_NAMESPACE}.kube-master kubectl get pods --all-namespaces \
           -o go-template='{{range $x := .items}}{{range $x.spec.containers}}{{$x.spec.nodeName}}{{" "}}{{$x.metadata.namespace}}{{" "}}{{$x.metadata.name}}{{" "}}{{.name}}{{"\n"}}{{end}}{{end}}' |
     while read node ns pod container; do
       echo "@@@ pod-${node}-${ns}-${pod}--${container}.log @@@"
-      docker exec kube-master kubectl logs -n "${ns}" -c "${container}" "${pod}"
+      docker exec ${DIND_NAMESPACE}.kube-master kubectl logs -n "${ns}" -c "${container}" "${pod}"
     done
   echo "@@@ kubectl-all.txt @@@"
-  docker exec kube-master kubectl get all --all-namespaces -o wide
+  docker exec ${DIND_NAMESPACE}.kube-master kubectl get all --all-namespaces -o wide
   echo "@@@ describe-all.txt @@@"
-  docker exec kube-master kubectl describe all --all-namespaces
+  docker exec ${DIND_NAMESPACE}.kube-master kubectl describe all --all-namespaces
   echo "@@@ nodes.txt @@@"
-  docker exec kube-master kubectl get nodes -o wide
+  docker exec ${DIND_NAMESPACE}.kube-master kubectl get nodes -o wide
 }
 
 function dind::dump64 {
   echo "%%% start-base64 %%%"
-  dind::dump | docker exec -i kube-master /bin/sh -c "lzma | base64 -w 100"
+  dind::dump | docker exec -i ${DIND_NAMESPACE}.kube-master /bin/sh -c "lzma | base64 -w 100"
   echo "%%% end-base64 %%%"
 }
 

@@ -6,16 +6,17 @@ TIDB_IMAGES="tidb tikv pd"
 TIDB_BASE_TAG="v1.0.8"
 IMAGES="tidb-tools:latest tidb-dashboard-installer:v1.0.7 grafana:4.2.0 prometheus:v2.0.0 pushgateway:v0.3.1"
 
+REGISTRY_PORT=${REGISTRY_PORT:-5000}
 # format -> namespace:dind_subnet:apiserver_port:local_registry_port:cloud_manager_port
 CLUSTERS=(
-e2e-v1.7:10.192.0.0:8080:5000:32333
-stability-v1.7:10.193.0.0:8081:5001:32334
-e2e-v1.8:10.194.0.0:8082:5002:32335
-stability-v1.8:10.195.0.0:8083:5003:32336
-e2e-v1.9:10.196.0.0:8084:5004:32337
-stability-v1.9:10.197.0.0:8085:5005:32338
-e2e-v1.10:10.198.0.0:8085:5006:32339
-stability-v1.10:10.199.0.0:8086:5007:32340
+e2e-v1.7:10.192.0.0:8080:${REGISTRY_PORT}:32333
+stability-v1.7:10.193.0.0:8081:${REGISTRY_PORT}:32334
+e2e-v1.8:10.194.0.0:8082:${REGISTRY_PORT}:32335
+stability-v1.8:10.195.0.0:8083:${REGISTRY_PORT}:32336
+e2e-v1.9:10.196.0.0:8084:${REGISTRY_PORT}:32337
+stability-v1.9:10.197.0.0:8085:${REGISTRY_PORT}:32338
+e2e-v1.10:10.198.0.0:8085:${REGISTRY_PORT}:32339
+stability-v1.10:10.199.0.0:8086:${REGISTRY_PORT}:32340
 )
 
 ### change workspace

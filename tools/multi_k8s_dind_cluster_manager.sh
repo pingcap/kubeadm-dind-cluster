@@ -1,12 +1,14 @@
 #!/bin/bash -e
 
 SOURCE_REGISTRY=uhub.ucloud.cn/pingcap
-INIT_DEPLOYS="registry-proxy.yaml"
+INIT_DEPLOYS="registry-proxy.yaml nfs-deployment.yaml nfs-storageclass.yaml"
 TIDB_IMAGES="tidb tikv pd"
 TIDB_BASE_TAG="v1.0.8"
 IMAGES="tidb-tools:latest tidb-dashboard-installer:v1.0.7 grafana:4.2.0 prometheus:v2.0.0 pushgateway:v0.3.1"
 
 REGISTRY_PORT=${REGISTRY_PORT:-5000}
+# use nfs provisioner in dind
+DIND_USE_NFS_STORAGE="${DIND_USE_NFS_STORAGE:-true}"
 # format -> namespace:dind_subnet:apiserver_port:local_registry_port:cloud_manager_port
 CLUSTERS=(
 e2e-v1.7:10.192.0.0:8080:${REGISTRY_PORT}:32333
@@ -80,10 +82,20 @@ function rebuild::deploy_apps {
     do
         if [[ ${deploy} == "registry-proxy.yaml" ]]
         then
+            rebuild::step "start to apply ${deploy}"
             sed "s/10.192.0.2/${master_ip}/g" ./manifests/${deploy}|kubectl apply -f -
             continue
         fi
-        kubectl apply -f ${deploy}
+        if [[ ${deploy} == "nfs-deployment.yaml" || ${deploy} == "nfs-storageclass.yaml" ]]
+        then
+            if [[ ${DIND_USE_NFS_STORAGE} == "true" ]]
+            then
+                rebuild::step "start to apply ${deploy}"
+                kubectl apply -f ./manifests/${deploy}
+            fi
+            continue
+        fi
+        kubectl apply -f ./manifests/${deploy}
     done
 }
 

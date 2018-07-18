@@ -128,6 +128,10 @@ DIND_NO_PROXY="${DIND_NO_PROXY:-}"
 KUBE_REPO_PREFIX="${KUBE_REPO_PREFIX:-uhub.service.ucloud.cn/pingcap}"
 KUBERNETES_VERSION="${KUBERNETES_VERSION:-v1.7.8}"
 
+### use nfs provisioner in dind
+HOST_MOUNT_PATH="${HOST_MOUNT_PATH:-/home/jenkins/export}"
+DIND_USE_NFS_STORAGE="${DIND_USE_NFS_STORAGE:-true}"
+
 if [[ ! ${LOCAL_KUBECTL_VERSION:-} && ${DIND_IMAGE:-} =~ :(v[0-9]+\.[0-9]+)$ ]]; then
   LOCAL_KUBECTL_VERSION="${BASH_REMATCH[1]}"
 fi
@@ -573,6 +577,9 @@ function dind::run {
   ####### expose registry port ########
   if [[ "${container_name}" = "kube-master" ]]; then
     opts+=(-p 127.0.0.1:${REGISTRY_PORT}:5001 -p 127.0.0.1:${CLOUD_MANAGER_PORT}:2333)
+    if [[ ${DIND_USE_NFS_STORAGE} = "true" ]]; then
+      opts+=(-v ${HOST_MOUNT_PATH}:/nfs)
+    fi
   fi
 
   if [[ ${CNI_PLUGIN} = bridge && ${netshift} ]]; then

@@ -175,9 +175,9 @@ DIND_DAEMON_JSON_FILE="${DIND_DAEMON_JSON_FILE:-/etc/docker/daemon.json}"  # can
 DIND_REGISTRY_MIRROR="${DIND_REGISTRY_MIRROR:-}"  # plain string format
 DIND_INSECURE_REGISTRIES="${DIND_INSECURE_REGISTRIES:-}"  # json list format
 
-FEATURE_GATES="${FEATURE_GATES:-MountPropagation=true,TaintBasedEvictions=true}"
+FEATURE_GATES="${FEATURE_GATES:-TaintBasedEvictions=true}"
 # you can set special value 'none' not to set any kubelet's feature gates.
-KUBELET_FEATURE_GATES="${KUBELET_FEATURE_GATES:-MountPropagation=true,DynamicKubeletConfig=true}"
+KUBELET_FEATURE_GATES="${KUBELET_FEATURE_GATES:-DynamicKubeletConfig=true}"
 
 ### use nfs provisioner in dind
 HOST_MOUNT_PATH="${HOST_MOUNT_PATH:-/home/jenkins/export}"

@@ -1,9 +1,10 @@
-#!/bin/bash -e
+#!/bin/bash
 
 SOURCE_REGISTRY=uhub.ucloud.cn/pingcap
 INIT_DEPLOYS="registry-proxy.yaml nfs-deployment.yaml nfs-storageclass.yaml"
 TIDB_IMAGES="tidb tikv pd"
 TIDB_BASE_TAG="v1.0.8"
+TILLER_VERSION="v2.8.2"
 IMAGES="tidb-tools:latest tidb-dashboard-installer:v1.0.7 grafana:4.2.0 prometheus:v2.0.0 pushgateway:v0.3.1"
 
 REGISTRY_PORT=${REGISTRY_PORT:-5000}
@@ -97,6 +98,11 @@ function rebuild::deploy_apps {
         fi
         kubectl apply -f ./manifests/${deploy}
     done
+    hash helm 2>/dev/null
+    if [[ $? -eq 0 ]]
+    then
+       helm init --tiller-image uhub.ucloud.cn/pingcap/tiller:${TILLER_VERSION}
+    fi
 }
 
 function rebuild::push_images_to_local {

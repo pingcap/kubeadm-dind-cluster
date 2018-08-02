@@ -101,7 +101,7 @@ function rebuild::deploy_apps {
     hash helm 2>/dev/null
     if [[ $? -eq 0 ]]
     then
-       helm init --tiller-image uhub.ucloud.cn/pingcap/tiller:${TILLER_VERSION}
+       helm init --upgrade || helm init --tiller-image uhub.ucloud.cn/pingcap/tiller:${TILLER_VERSION}
     fi
 }
 

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 SOURCE_REGISTRY=uhub.ucloud.cn/pingcap
-INIT_DEPLOYS="registry-proxy.yaml nfs-deployment.yaml nfs-storageclass.yaml"
+INIT_DEPLOYS="registry-proxy.yaml nfs-deployment.yaml nfs-storageclass.yaml local-storageclass.yaml"
 TIDB_IMAGES="tidb tikv pd"
 TILLER_VERSION="v2.8.2"
 TIDB_BASE_TAG="v2.0.4"

@@ -130,7 +130,7 @@ KUBERNETES_VERSION="${KUBERNETES_VERSION:-v1.7.8}"
 
 ### use nfs provisioner in dind
 HOST_MOUNT_PATH="${HOST_MOUNT_PATH:-/home/jenkins/export}"
-DIND_USE_NFS_STORAGE="${DIND_USE_NFS_STORAGE:-true}"
+DIND_USE_NFS_STORAGE="${DIND_USE_NFS_STORAGE:-false}"
 
 if [[ ! ${LOCAL_KUBECTL_VERSION:-} && ${DIND_IMAGE:-} =~ :(v[0-9]+\.[0-9]+)$ ]]; then
   LOCAL_KUBECTL_VERSION="${BASH_REMATCH[1]}"

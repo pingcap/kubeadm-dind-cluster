@@ -9,7 +9,7 @@ IMAGES="tidb-tools:latest tidb-dashboard-installer:v1.0.7 grafana:4.2.0 promethe
 
 REGISTRY_PORT=${REGISTRY_PORT:-5000}
 # use nfs provisioner in dind
-DIND_USE_NFS_STORAGE="${DIND_USE_NFS_STORAGE:-true}"
+DIND_USE_NFS_STORAGE="${DIND_USE_NFS_STORAGE:-false}"
 # format -> namespace:dind_subnet:apiserver_port:local_registry_port:cloud_manager_port
 CLUSTERS=(
 e2e-v1.7:10.192.0.0:8080:${REGISTRY_PORT}:32333
